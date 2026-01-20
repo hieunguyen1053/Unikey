@@ -132,11 +132,14 @@ func testUkEngine() {
   print("\n  --- Multi-Character Word Tests ---")
   let wordTests: [(String, String)] = [
     ("viet", "viet"),
-    ("vieet", "việt"),
-    ("nhieu", "nhiêu"),
-    ("nhieuf", "nhiều"),  // <-- The failing case!
+    ("vieet", "viêt"),
+    ("vieetj", "việt"),
+    ("nhieu", "nhieu"),
+    ("nhieeu", "nhiêu"),
+    ("nhieeuf", "nhiều"),
     ("nguoi", "nguoi"),
-    ("nguowif", "người"),
+    ("nguowif", "người"),  // uow -> ươ (correct behavior)
+    ("nguowwif", "nguòi"),  // uoww -> uo (toggles back)
   ]
 
   for (input, expected) in wordTests {

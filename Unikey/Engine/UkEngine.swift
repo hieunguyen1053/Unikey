@@ -215,6 +215,22 @@ public class UkEngine {
                 buffer[vStart + i].vseq = seqInfo.subsequences[i]
               }
             }
+
+            // Reposition tone if needed
+            // Logic ported from x-unikey ukengine.cpp processAppend (lines 1597-1608)
+            let oldSeqLen = vowelSeqList[prev.vseq.rawValue].length
+            let oldVStart = current - 1 - (oldSeqLen - 1)
+            let oldTonePos = oldVStart + getTonePosition(prev.vseq, terminated: true)
+
+            if oldTonePos >= 0 && oldTonePos < current && buffer[oldTonePos].tone != 0 {
+              let tone = buffer[oldTonePos].tone
+              let newTonePos = vStart + getTonePosition(newSeq, terminated: false)
+
+              if newTonePos != oldTonePos {
+                buffer[newTonePos].tone = tone
+                buffer[oldTonePos].tone = 0
+              }
+            }
           } else {
             // Can't extend, start new
             info.form = .v
@@ -298,17 +314,16 @@ public class UkEngine {
     var result = ProcessResult()
 
     // Must have a vowel to add tone
-    guard current >= 0, buffer[current].vOffset >= 0 else {
+    guard current >= 0, let vRange = getVowelRange(at: current) else {
       return processAppend(event)
     }
 
-    let vEnd = current - buffer[current].vOffset
+    let vStart = vRange.start
+    let vEnd = vRange.end
     let vs = buffer[vEnd].vseq
     guard vs != .none, let vInfo = getVowelSeqInfo(vs) else {
       return processAppend(event)
     }
-
-    let vStart = vEnd - (vInfo.length - 1)
     let newTone = event.tone
 
     // Find tone position (use Vietnamese tone placement rules)
@@ -345,17 +360,16 @@ public class UkEngine {
   private func processRoof(_ event: KeyEvent) -> ProcessResult {
     var result = ProcessResult()
 
-    guard current >= 0, buffer[current].vOffset >= 0 else {
+    guard current >= 0, let vRange = getVowelRange(at: current) else {
       return processAppend(event)
     }
 
-    let vEnd = current - buffer[current].vOffset
+    let vStart = vRange.start
+    let vEnd = vRange.end
     let vs = buffer[vEnd].vseq
     guard vs != .none, let vInfo = getVowelSeqInfo(vs) else {
       return processAppend(event)
     }
-
-    let vStart = vEnd - (vInfo.length - 1)
 
     // Determine target based on event type
     let targetBase: VnLexiName?
@@ -425,21 +439,30 @@ public class UkEngine {
   private func processHook(_ event: KeyEvent) -> ProcessResult {
     var result = ProcessResult()
 
-    guard current >= 0, buffer[current].vOffset >= 0 else {
+    guard current >= 0, let vRange = getVowelRange(at: current) else {
       return processAppend(event)
     }
 
-    let vEnd = current - buffer[current].vOffset
+    let vStart = vRange.start
+    let vEnd = vRange.end
     let vs = buffer[vEnd].vseq
-    guard vs != .none, let vInfo = getVowelSeqInfo(vs) else {
+    guard vs != .none, let info = getVowelSeqInfo(vs) else {
       return processAppend(event)
     }
 
-    let vStart = vEnd - (vInfo.length - 1)
+    // Check for special UO hook handling (uo, uo^, uo^i...)
+    // Ported from x-unikey ukengine.cpp processHook (lines 800-804)
+    if getVowelSeqLength(vs) > 1 &&
+       event.eventType != .bowl &&
+       (info.vowels.count > 0 && (info.vowels[0] == .u || info.vowels[0] == .uh)) &&
+       (info.vowels.count > 1 && (info.vowels[1] == .o || info.vowels[1] == .oh || info.vowels[1] == .or)) {
+         return processHookWithUO(event, vRange: vRange)
+    }
 
-    if vInfo.hookPosition >= 0 {
+    // Original logic continues here, using `info` (which is `vInfo` from original code)
+    if info.hookPosition >= 0 {
       // Already has hook - remove it
-      let hookPos = vStart + vInfo.hookPosition
+      let hookPos = vStart + info.hookPosition
 
       if !freeMarking && hookPos != current {
         return processAppend(event)
@@ -449,9 +472,9 @@ public class UkEngine {
 
       result = rewriteBuffer(from: hookPos)
       singleMode = true
-    } else if vInfo.withHook != .none {
+    } else if info.withHook != .none {
       // Can add hook
-      let newVs = vInfo.withHook
+      let newVs = info.withHook
       guard let newInfo = getVowelSeqInfo(newVs) else {
         return processAppend(event)
       }
@@ -537,8 +560,10 @@ public class UkEngine {
     }
 
     // Try hook first
+    // Telex W acts as hook_uo (like VNI 7, not just hookAll)
+    // allowing uo -> ươ conversion
     let hookResult = processHook(
-      KeyEvent(eventType: .hookAll, charType: .vn, vnSymbol: .w, keyCode: event.keyCode))
+      KeyEvent(eventType: .hook_uo, charType: .vn, vnSymbol: .w, keyCode: event.keyCode))
 
     if hookResult.handled && !hookResult.output.isEmpty {
       return hookResult
@@ -550,39 +575,190 @@ public class UkEngine {
 
   // MARK: - Helper Methods
 
+  /// Get vowel sequence length helper
+  private func getVowelSeqLength(_ vs: VowelSequence) -> Int {
+    return getVowelSeqInfo(vs)?.length ?? 0
+  }
+
+  /// Process hook with UO special handling
+  /// Ported from x-unikey ukengine.cpp processHookWithUO
+  private func processHookWithUO(_ event: KeyEvent, vRange: (start: Int, end: Int)) -> ProcessResult
+  {
+    var result = ProcessResult()
+     _ = result // Suppress unused warning or just use empty result init
+    
+    let vStart = vRange.start
+    let vEnd = vRange.end
+    let vs = buffer[vEnd].vseq
+
+    guard let info = getVowelSeqInfo(vs) else { return processAppend(event) }
+    let v = info.vowels
+
+    var newVs: VowelSequence = .none
+    var changeIndices: [Int] = []
+    var newSyms: [VnLexiName] = []
+
+    // Logic to determine new sequence
+    switch event.eventType {
+    case .hook_u:
+      if v[0] == .u {
+        newVs = info.withHook
+        changeIndices = [0]
+        newSyms = [.uh]
+      } else {  // v[0] == .uh -> uo
+        let v3 = v.count > 2 ? v[2] : .nonVnChar
+        newVs = lookupVowelSeq(.u, .o, v3)
+        changeIndices = [0, 1]
+        newSyms = [.u, .o]
+      }
+
+    case .hook_o:
+      let v1 = v[1]
+      if v1 == .o || v1 == .or {
+        // Check for o|o^ -> o+ (th + cv case skipped for simplicity or check?)
+        // Unikey checks for "th" preceding... lets implement basic first
+        let v3 = v.count > 2 ? v[2] : .nonVnChar
+        newVs = lookupVowelSeq(.uh, .oh, v3)  // uh oh
+        if v[0] == .u {
+          changeIndices = [0, 1]
+          newSyms = [.uh, .oh]
+        } else {
+          changeIndices = [1]
+          newSyms = [.oh]
+        }
+      } else {  // v[1] == .oh -> uo
+        let v3 = v.count > 2 ? v[2] : .nonVnChar
+        newVs = lookupVowelSeq(.u, .o, v3)
+        changeIndices = [0, 1]
+        newSyms = [.u, .o]
+      }
+
+    case .hook_uo:  // Telex W, VNI 7
+      // Toggle uo <-> ươ
+      if v[0] == .uh && v[1] == .oh {  // ươ -> uo
+        let v3 = v.count > 2 ? v[2] : .nonVnChar
+        newVs = lookupVowelSeq(.u, .o, v3)
+        changeIndices = [0, 1]
+        newSyms = [.u, .o]
+      } else if v[0] == .u && v[1] == .o {  // uo -> ươ
+        let v3 = v.count > 2 ? v[2] : .nonVnChar
+        newVs = lookupVowelSeq(.uh, .oh, v3)
+        changeIndices = [0, 1]
+        newSyms = [.uh, .oh]
+      }
+
+    case .hookAll:
+      // Try hook_uo logic first
+      if v[0] == .u && v[1] == .o {
+        let v3 = v.count > 2 ? v[2] : .nonVnChar
+        newVs = lookupVowelSeq(.uh, .oh, v3)
+        changeIndices = [0, 1]
+        newSyms = [.uh, .oh]
+      }
+    // Fallback to table if needed?
+
+    default:
+      break
+    }
+
+    if newVs == .none {
+      // Fallback to standard hook
+      // But verify if standard hook is acceptable (not already handled)
+      return processAppend(event)
+    }
+
+    // Apply changes
+    if !freeMarking && vEnd != current {
+      return processAppend(event)
+    }
+
+    // Update symbols
+    for (i, idx) in changeIndices.enumerated() {
+      let pos = vStart + idx
+      buffer[pos].vnSym = newSyms[i]
+      // Reset tone on changed chars? Unikey does sophisticated tone restoration.
+      // For now, let's keep it simple: if symbols change, tone might need reset.
+      // Unikey clears tone if it moves or changes significantly.
+      // Let's implement basic tone preservation if possible?
+      // Unikey: if removing hook/roof, keeps tone. If adding, keeps tone.
+      // processHookWithUO in C++ handles tone removal/move carefully.
+      // For simplicity: keep tone on index if valid.
+    }
+
+    updateVowelSequence(vStart: vStart, newSeq: newVs)
+
+    // Reposition tone (critical for ươ case)
+    let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == current)
+    // Find where tone was
+    // ... basic logic: scan range, find tone, move to newTonePos
+    var foundTone = 0
+    for i in vStart...vEnd {
+      if buffer[i].tone != 0 {
+        foundTone = buffer[i].tone
+        buffer[i].tone = 0
+      }
+    }
+    if foundTone != 0 {
+      buffer[newTonePos].tone = foundTone
+    }
+
+    return rewriteBuffer(from: vStart)
+  }
+
   /// Get tone position within vowel sequence (Vietnamese rules)
+  private func getVowelRange(at index: Int) -> (start: Int, end: Int)? {
+    guard index >= 0 && index < maxEngineBuffer else { return nil }
+
+    // Check if we have valid vowel info
+    guard buffer[index].vOffset >= 0 else { return nil }
+
+    let vStart = index - buffer[index].vOffset
+    guard vStart >= 0 else { return nil }
+
+    // Use stored vseq length if possible, or scan forward
+    // Since we maintain vseq in the last vowel character, scanning is reliable
+    var vEnd = vStart
+    while vEnd + 1 <= current && buffer[vEnd + 1].vnSym.isVowel {
+      vEnd += 1
+    }
+
+    return (vStart, vEnd)
+  }
+
+  /// Get tone position within vowel sequence (Vietnamese rules)
+  /// Get tone position within vowel sequence (Vietnamese rules)
+  /// Ported from x-unikey ukengine.cpp getTonePosition
   private func getTonePosition(_ vs: VowelSequence, terminated: Bool) -> Int {
     guard let info = getVowelSeqInfo(vs) else { return 0 }
 
-    // Vietnamese tone placement rules:
-    // 1. If single vowel: on that vowel
-    // 2. If double vowel ending word: on first vowel
-    // 3. If double vowel with ending consonant: on second vowel
-    // 4. If triple vowel: on middle vowel
-
-    switch info.length {
-    case 1:
-      return 0
-    case 2:
-      // If word continues (has consonant suffix), tone on second vowel
-      // If word ends, tone on first vowel with some exceptions
-      if terminated {
-        // Check for "oa", "oe", "uy" rules
-        if vs == .oa || vs == .oab || vs == .oe {
-          return 1  // tone on 'a' or 'e'
-        }
-        if vs == .uy {
-          return 1  // tone on 'y'
-        }
-        return 0  // default: first vowel
-      } else {
-        return 1  // with consonant suffix: second vowel
-      }
-    case 3:
-      return 1  // middle vowel
-    default:
+    if info.length == 1 {
       return 0
     }
+
+    if info.roofPosition != -1 {
+      return info.roofPosition
+    }
+
+    if info.hookPosition != -1 {
+      // Special cases: u+o+, u+o+u, u+o+i -> tone on 2nd char (o)
+      // In our table: uhoh, uhohi, uhohu
+      if vs == .uhoh || vs == .uhohi || vs == .uhohu {
+        return 1
+      }
+      return info.hookPosition
+    }
+
+    if info.length == 3 {
+      return 1
+    }
+
+    // Modern style check (always enabled for now)
+    // oa, oe, uy -> tone on 2nd char
+    if vs == .oa || vs == .oe || vs == .uy {
+      return 1
+    }
+
+    return terminated ? 0 : 1
   }
 
   /// Update vowel sequence in buffer
