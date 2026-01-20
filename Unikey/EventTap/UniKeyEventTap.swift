@@ -197,7 +197,7 @@ class UniKeyEventTap {
 
                 // If outSize > 0 (restoration), inject text.
                 // We consume original Backspace.
-                injector.inject(backspaceCount: 0, text: text, proxy: proxy)
+                injector.inject(backspaceCount: backs, text: text, proxy: proxy)
                 // Wait, if we consume backspace, we don't delete.
                 // But the engine logic assumes we are deleting?
                 // processBackspace logic:
