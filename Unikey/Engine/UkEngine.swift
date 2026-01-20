@@ -318,7 +318,7 @@ public class UkEngine {
             writeOutput()
         }
         outType = m_outType
-        outBuf.append(contentsOf: m_outBuf)
+        outBuf = m_outBuf
         outSize = outBuf.count
 
         return ret
@@ -394,7 +394,21 @@ public class UkEngine {
         return 1
     }
 
-    private func restoreKeyStrokes() -> Int {
+    public func restoreKeyStrokes(
+        _ backs: inout Int,
+        _ outBuf: inout [UInt16],
+        _ outSize: inout Int,
+        _ outType: inout UkOutputType
+    ) -> Int {
+        let ret = _restoreKeyStrokes()
+        backs = m_backs
+        outBuf = m_outBuf
+        outSize = outBuf.count
+        outType = m_outType
+        return ret
+    }
+
+    private func _restoreKeyStrokes() -> Int {
         m_outType = .keyOutput
 
         if !lastWordHasVnMark() {
@@ -563,7 +577,7 @@ public class UkEngine {
         }
 
         if ctrl.options.autoNonVnRestore && lastWordIsNonVn() {
-            if restoreKeyStrokes() != 0 {
+            if _restoreKeyStrokes() != 0 {
                 m_keyRestored = true
                 m_outputWritten = true
             }
