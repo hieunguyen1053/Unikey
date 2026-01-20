@@ -1,1030 +1,1687 @@
-// Unikey Swift Engine - Core Engine
-// Ported from x-unikey-1.0.4/src/ukengine/ukengine.cpp
+// Unikey Swift Engine
+// Ported from x-unikey-1.0.4/src/ukengine/ukengine.cpp & .h
 // Copyright (C) 2000-2005 Pham Kim Long
-// Swift port by Gemini
+// Swift port by Jules
 
 import Foundation
 
-/// Maximum buffer size for word processing
-private let maxEngineBuffer = 128
+// MARK: - Constants & Enums
 
-/// Word form types
-public enum WordForm {
-  case nonVn  // Non-Vietnamese word
-  case empty  // Empty buffer
-  case c  // Consonant only
-  case v  // Vowel only
-  case cv  // Consonant + Vowel
-  case vc  // Vowel + Consonant
-  case cvc  // Consonant + Vowel + Consonant
+public let MAX_UK_ENGINE = 128
+
+public enum VnWordForm: Int {
+    case nonVn = 0, empty, c, v, cv, vc, cvc
 }
 
-/// Information about each position in the word buffer
+public enum UkOutputType: Int {
+    case normal = 0
+}
+
+public struct UnikeyOptions {
+    public var vietKeyEnabled: Bool = true
+    public var freeMarking: Bool = true
+    public var spellCheckEnabled: Bool = true
+    public var modernStyle: Bool = true // oa, oe, uy tone pos
+    public var allowUoa: Bool = false // allow uoa (uòa) style
+    public var macroEnabled: Bool = true
+    public var autoNonVnRestore: Bool = true
+
+    public init() {}
+}
+
+public class UkSharedMem {
+    public var initialized: Int = 0
+    public var vietKey: Int = 1
+    public var iconShown: Int = 0
+
+    public var options = UnikeyOptions()
+    public var input = UkInputProcessor()
+
+    public var usrKeyMapLoaded: Int = 0
+    public var usrKeyMap: [Int] = Array(repeating: 0, count: 256)
+    public var charsetId: Int = 0
+
+    public var macStore = MacroTable()
+
+    public init() {}
+}
+
+public struct KeyBufEntry {
+    var ev: UkKeyEvent
+    var converted: Bool
+
+    init(ev: UkKeyEvent = UkKeyEvent(), converted: Bool = false) {
+        self.ev = ev
+        self.converted = converted
+    }
+}
+
 public struct WordInfo {
-  // Word structure info
-  var form: WordForm = .empty
-  var c1Offset: Int = -1  // Offset to first consonant (-1 if none)
-  var vOffset: Int = -1  // Offset to vowel sequence (-1 if none)
-  var c2Offset: Int = -1  // Offset to ending consonant (-1 if none)
+    var form: VnWordForm = .empty
+    var c1Offset: Int = -1
+    var vOffset: Int = -1
+    var c2Offset: Int = -1
 
-  // Sequence info at this position
-  var vseq: VowelSequence = .none
-  var cseq: ConsonantSequence = .none
+    var vseq: VowelSequence = .none
+    var cseq: ConsonantSequence = .none
 
-  // Character info
-  var caps: Bool = false  // Is uppercase
-  var tone: Int = 0  // Tone (0-5)
-  var vnSym: VnLexiName = .nonVnChar  // Vietnamese symbol
-  var keyCode: UInt32 = 0  // Original key code
+    var caps: Bool = false
+    var tone: Int = 0
+    var vnSym: VnLexiName = .nonVnChar
+    var keyCode: UInt32 = 0
 }
 
-/// Keystroke buffer entry
-struct KeyBufEntry {
-  var keyCode: UInt32
-  var char: Character
-  var isConverted: Bool = false  // True if this key triggered a VN modification
+public typealias CheckKeyboardCaseCb = (_ shiftPressed: inout Int, _ capslockOn: inout Int) -> Void
+
+// MARK: - Validation Tables
+
+private struct VCPair: Hashable {
+    var v: VowelSequence
+    var c: ConsonantSequence
 }
 
-/// Helper to quick record key
-extension UkEngine {
-  private func recordKey(_ event: KeyEvent) {
-    let keyEntry = KeyBufEntry(
-      keyCode: event.keyCode, char: Character(UnicodeScalar(event.keyCode) ?? " "),
-      isConverted: true)
-    keyStrokes.append(keyEntry)
-  }
-}
+private let validVCPairs: Set<VCPair> = [
+    VCPair(v: .a, c: .c), VCPair(v: .a, c: .ch), VCPair(v: .a, c: .m), VCPair(v: .a, c: .n), VCPair(v: .a, c: .ng), VCPair(v: .a, c: .nh), VCPair(v: .a, c: .p), VCPair(v: .a, c: .t),
+    VCPair(v: .ar, c: .c), VCPair(v: .ar, c: .m), VCPair(v: .ar, c: .n), VCPair(v: .ar, c: .ng), VCPair(v: .ar, c: .p), VCPair(v: .ar, c: .t),
+    VCPair(v: .ab, c: .c), VCPair(v: .ab, c: .m), VCPair(v: .ab, c: .n), VCPair(v: .ab, c: .ng), VCPair(v: .ab, c: .p), VCPair(v: .ab, c: .t),
 
-/// Processing result from engine
-public struct ProcessResult {
-  /// Number of backspaces needed to delete old output
-  public var backspaceCount: Int = 0
+    VCPair(v: .e, c: .c), VCPair(v: .e, c: .ch), VCPair(v: .e, c: .m), VCPair(v: .e, c: .n), VCPair(v: .e, c: .ng), VCPair(v: .e, c: .nh), VCPair(v: .e, c: .p), VCPair(v: .e, c: .t),
+    VCPair(v: .er, c: .c), VCPair(v: .er, c: .ch), VCPair(v: .er, c: .m), VCPair(v: .er, c: .n), VCPair(v: .er, c: .nh), VCPair(v: .er, c: .p), VCPair(v: .er, c: .t),
 
-  /// New characters to output
-  public var output: String = ""
+    VCPair(v: .i, c: .c), VCPair(v: .i, c: .ch), VCPair(v: .i, c: .m), VCPair(v: .i, c: .n), VCPair(v: .i, c: .nh), VCPair(v: .i, c: .p), VCPair(v: .i, c: .t),
 
-  /// Whether processing was handled
-  public var handled: Bool = false
-}
+    VCPair(v: .o, c: .c), VCPair(v: .o, c: .m), VCPair(v: .o, c: .n), VCPair(v: .o, c: .ng), VCPair(v: .o, c: .p), VCPair(v: .o, c: .t),
+    VCPair(v: .or, c: .c), VCPair(v: .or, c: .m), VCPair(v: .or, c: .n), VCPair(v: .or, c: .ng), VCPair(v: .or, c: .p), VCPair(v: .or, c: .t),
+    VCPair(v: .oh, c: .m), VCPair(v: .oh, c: .n), VCPair(v: .oh, c: .p), VCPair(v: .oh, c: .t),
 
-/// Main Unikey Engine - processes keystrokes to produce Vietnamese text
+    VCPair(v: .u, c: .c), VCPair(v: .u, c: .m), VCPair(v: .u, c: .n), VCPair(v: .u, c: .ng), VCPair(v: .u, c: .p), VCPair(v: .u, c: .t),
+    VCPair(v: .uh, c: .c), VCPair(v: .uh, c: .m), VCPair(v: .uh, c: .n), VCPair(v: .uh, c: .ng), VCPair(v: .uh, c: .t),
+
+    VCPair(v: .y, c: .t),
+
+    VCPair(v: .ie, c: .c), VCPair(v: .ie, c: .m), VCPair(v: .ie, c: .n), VCPair(v: .ie, c: .ng), VCPair(v: .ie, c: .p), VCPair(v: .ie, c: .t),
+    VCPair(v: .ier, c: .c), VCPair(v: .ier, c: .m), VCPair(v: .ier, c: .n), VCPair(v: .ier, c: .ng), VCPair(v: .ier, c: .p), VCPair(v: .ier, c: .t),
+
+    VCPair(v: .oa, c: .c), VCPair(v: .oa, c: .ch), VCPair(v: .oa, c: .m), VCPair(v: .oa, c: .n), VCPair(v: .oa, c: .ng), VCPair(v: .oa, c: .nh), VCPair(v: .oa, c: .p), VCPair(v: .oa, c: .t),
+    VCPair(v: .oab, c: .c), VCPair(v: .oab, c: .m), VCPair(v: .oab, c: .n), VCPair(v: .oab, c: .ng), VCPair(v: .oab, c: .t),
+
+    VCPair(v: .oe, c: .n), VCPair(v: .oe, c: .t),
+
+    VCPair(v: .ua, c: .n), VCPair(v: .ua, c: .ng), VCPair(v: .ua, c: .t),
+    VCPair(v: .uar, c: .n), VCPair(v: .uar, c: .ng), VCPair(v: .uar, c: .t),
+
+    VCPair(v: .ue, c: .c), VCPair(v: .ue, c: .ch), VCPair(v: .ue, c: .n), VCPair(v: .ue, c: .nh),
+    VCPair(v: .uer, c: .c), VCPair(v: .uer, c: .ch), VCPair(v: .uer, c: .n), VCPair(v: .uer, c: .nh),
+
+    VCPair(v: .uo, c: .c), VCPair(v: .uo, c: .m), VCPair(v: .uo, c: .n), VCPair(v: .uo, c: .ng), VCPair(v: .uo, c: .p), VCPair(v: .uo, c: .t),
+    VCPair(v: .uor, c: .c), VCPair(v: .uor, c: .m), VCPair(v: .uor, c: .n), VCPair(v: .uor, c: .ng), VCPair(v: .uor, c: .t),
+    VCPair(v: .uho, c: .c), VCPair(v: .uho, c: .m), VCPair(v: .uho, c: .n), VCPair(v: .uho, c: .ng), VCPair(v: .uho, c: .p), VCPair(v: .uho, c: .t),
+    VCPair(v: .uhoh, c: .c), VCPair(v: .uhoh, c: .m), VCPair(v: .uhoh, c: .n), VCPair(v: .uhoh, c: .ng), VCPair(v: .uhoh, c: .p), VCPair(v: .uhoh, c: .t),
+
+    VCPair(v: .uy, c: .c), VCPair(v: .uy, c: .ch), VCPair(v: .uy, c: .n), VCPair(v: .uy, c: .nh), VCPair(v: .uy, c: .p), VCPair(v: .uy, c: .t),
+
+    VCPair(v: .ye, c: .m), VCPair(v: .ye, c: .n), VCPair(v: .ye, c: .ng), VCPair(v: .ye, c: .p), VCPair(v: .ye, c: .t),
+    VCPair(v: .yer, c: .m), VCPair(v: .yer, c: .n), VCPair(v: .yer, c: .ng), VCPair(v: .yer, c: .t),
+
+    VCPair(v: .uye, c: .n), VCPair(v: .uye, c: .t),
+    VCPair(v: .uyer, c: .n), VCPair(v: .uyer, c: .t)
+]
+
+// MARK: - UkEngine Class
+
 public class UkEngine {
+    // Properties
+    private var m_keyCheckFunc: CheckKeyboardCaseCb?
+    private var m_pCtrl: UkSharedMem?
 
-  // MARK: - Properties
+    private var m_changePos: Int = 0
+    private var m_backs: Int = 0
+    private var m_bufSize: Int = MAX_UK_ENGINE
+    private var m_current: Int = -1
+    private var m_singleMode: Bool = false
 
-  private var buffer: [WordInfo] = Array(repeating: WordInfo(), count: maxEngineBuffer)
-  private var current: Int = -1
-  private var singleMode: Bool = false
+    private var m_keyBufSize: Int = MAX_UK_ENGINE
+    private var m_keyStrokes: [KeyBufEntry] = Array(repeating: KeyBufEntry(), count: MAX_UK_ENGINE)
+    private var m_keyCurrent: Int = -1
+    private var m_toEscape: Bool = false
 
-  // Spell check / Restoration
-  private var keyStrokes: [KeyBufEntry] = []
-  public var spellCheckEnabled: Bool = true
-  private var restoring: Bool = false  // Flag for restoration process
+    private var m_outBuf: [UInt16] = []
+    private var m_outputWritten: Bool = false
+    private var m_reverted: Bool = false
+    private var m_keyRestored: Bool = false
+    private var m_keyRestoring: Bool = false
+    private var m_outType: UkOutputType = .normal
 
-  private var inputProcessor = InputProcessor()
+    private var m_buffer: [WordInfo] = Array(repeating: WordInfo(), count: MAX_UK_ENGINE)
 
-  // Options
-  public var vietKeyEnabled: Bool = true
-  public var freeMarking: Bool = true  // Allow marking at any position
+    // MARK: - Public Methods
 
-  // MARK: - Initialization
-
-  public init() {
-    reset()
-  }
-
-  // MARK: - Public Methods
-
-  /// Reset engine state (call on word boundary)
-  public func reset() {
-    current = -1
-    singleMode = false
-    restoring = false
-    keyStrokes.removeAll()
-    for i in 0..<maxEngineBuffer {
-      buffer[i] = WordInfo()
-    }
-  }
-
-  /// Set input method
-  public func setInputMethod(_ method: InputMethod) {
-    inputProcessor.setInputMethod(method)
-  }
-
-  /// Get current input method
-  public func getInputMethod() -> InputMethod {
-    return inputProcessor.getInputMethod()
-  }
-
-  /// Check if at word beginning
-  public func atWordBeginning() -> Bool {
-    return current < 0
-  }
-
-  /// Process a key press
-  public func process(keyCode: UInt32, char: Character) -> ProcessResult {
-    var result = ProcessResult()
-
-    guard vietKeyEnabled else {
-      result.output = String(char)
-      result.handled = false
-      return result
+    public init() {
+        reset()
     }
 
-    let event = inputProcessor.keyCodeToEvent(keyCode, char: char)
-
-    switch event.charType {
-    case .reset:
-      reset()
-      result.handled = false
-      return result
-
-    case .wordBreak:
-      reset()
-      result.output = String(char)
-      result.handled = false
-      return result
-
-    case .nonVn, .vn:
-      break
+    public func setCtrlInfo(_ p: UkSharedMem) {
+        m_pCtrl = p
     }
 
-    // Process based on event type
-    switch event.eventType {
-    case .tone0, .tone1, .tone2, .tone3, .tone4, .tone5:
-      result = processTone(event)
-    case .roofAll, .roof_a, .roof_e, .roof_o:
-      result = processRoof(event)
-    case .hookAll, .hook_uo, .hook_u, .hook_o, .bowl:
-      result = processHook(event)
-    case .dd:
-      result = processDd(event)
-    case .telex_w:
-      result = processTelexW(event)
-    case .normal, .mapChar:
-      // Append first, then check
-      result = processAppend(event)
-      if spellCheckEnabled && !result.handled && keyStrokes.count > 0 {
-        // If append failed (e.g. buffer full?) or specifically rejected
-        // But normally append always 'handles' by adding char.
-        // The spell check logic is INSIDE processAppend or called after?
-        // Let's put it inside processAppend for atomic handling.
-      }
-    default:
-      result = processAppend(event)
+    public func setCheckKbCaseFunc(_ pFunc: @escaping CheckKeyboardCaseCb) {
+        m_keyCheckFunc = pFunc
     }
 
-    return result
-  }
-
-  /// Process backspace
-  public func processBackspace() -> ProcessResult {
-    var result = ProcessResult()
-
-    if current >= 0 {
-      current -= 1
+    public func atWordBeginning() -> Bool {
+        return (m_current < 0 || m_buffer[m_current].form == .empty)
     }
 
-    if !keyStrokes.isEmpty {
-      keyStrokes.removeLast()
+    public func pass(_ keyCode: Int) {
+        var ev = UkKeyEvent()
+        m_pCtrl?.input.keyCodeToEvent(UInt32(keyCode), &ev)
+        _ = processAppend(ev)
     }
 
-    result.backspaceCount = 1
-    result.handled = true
-    return result
-  }
-
-  // MARK: - Private Processing Methods
-
-  /// Append a character to buffer
-  private func processAppend(_ event: KeyEvent) -> ProcessResult {
-    var result = ProcessResult()
-
-    // Ensure buffer space
-    if current >= maxEngineBuffer - 2 {
-      reset()
+    public func setSingleMode() {
+        m_singleMode = true
     }
 
-    current += 1
-
-    var info = WordInfo()
-    info.keyCode = event.keyCode
-    info.vnSym = event.vnSymbol
-    info.caps = event.vnSymbol.isUppercase
-    info.tone = 0
-
-    // Record keystroke
-    var keyEntry = KeyBufEntry(
-      keyCode: event.keyCode, char: Character(UnicodeScalar(event.keyCode) ?? " "),
-      isConverted: false)
-    // Note: char might be different from event.vnSym if mapped. Using raw code for restoration.
-    // Ideally we pass original char to processAppend?
-    // Using simple mapping for now.
-
-    // Spell Check: Detect if we are breaking a word
-    // (Logic moved to check validity later)
-
-    // Propagate Non-Vietnamese state
-    if current > 0 && buffer[current - 1].form == .nonVn || event.vnSymbol == .nonVnChar {
-      info.form = .nonVn
-      buffer[current] = info
-      keyStrokes.append(keyEntry)
-      result.output = String(event.vnSymbol.toUnicode)
-      result.handled = true
-      return result
+    public func reset() {
+        m_current = -1
+        m_keyCurrent = -1
+        m_singleMode = false
+        m_toEscape = false
+        resetKeyBuf()
     }
 
-    // Determine word form based on character type
-    if event.vnSymbol.isVowel {
-      if current == 0 {
-        info.form = .v
-        info.vOffset = 0
-        info.vseq = lookupVowelSeq(event.vnSymbol.baseChar)
-      } else {
-        let prev = buffer[current - 1]
+    public func process(_ keyCode: UInt32, _ backs: inout Int, _ outBuf: inout [UInt16], _ outSize: inout Int, _ outType: inout UkOutputType) -> Int {
+        var ev = UkKeyEvent()
+        prepareBuffer()
+        m_backs = 0
+        m_changePos = m_current + 1
+        m_outBuf = []
+        m_outputWritten = false
+        m_reverted = false
+        m_keyRestored = false
+        m_keyRestoring = false
+        m_outType = .normal
 
-        // Try to extend vowel sequence
-        if prev.vOffset >= 0 {
-          let vStart = current - 1 - prev.vOffset
-          let existingLen = vowelSeqList[prev.vseq.rawValue].length
+        guard let ctrl = m_pCtrl else { return 0 }
 
-          // Try 2 or 3 vowel lookup
-          var newSeq: VowelSequence = .none
-          if existingLen == 1 {
-            newSeq = lookupVowelSeq(buffer[vStart].vnSym.baseChar, event.vnSymbol.baseChar)
-          } else if existingLen == 2 {
-            newSeq = lookupVowelSeq(
-              buffer[vStart].vnSym.baseChar,
-              buffer[vStart + 1].vnSym.baseChar,
-              event.vnSymbol.baseChar)
-          }
+        ctrl.input.keyCodeToEvent(keyCode, &ev)
 
-          if newSeq != .none {
-            info.form = prev.form
-            info.c1Offset = prev.c1Offset
-            info.vOffset = current - vStart
-            info.vseq = newSeq
+        var ret = 0
 
-            // Update subsequences
-            if let seqInfo = getVowelSeqInfo(newSeq) {
-              for i in 0..<seqInfo.length {
-                buffer[vStart + i].vseq = seqInfo.subsequences[i]
-              }
+        if !m_toEscape {
+            switch ev.evType {
+             case UkKeyEvName.roofAll.rawValue, UkKeyEvName.roof_a.rawValue, UkKeyEvName.roof_e.rawValue, UkKeyEvName.roof_o.rawValue:
+                 ret = processRoof(ev)
+             case UkKeyEvName.hookAll.rawValue, UkKeyEvName.hook_uo.rawValue, UkKeyEvName.hook_u.rawValue, UkKeyEvName.hook_o.rawValue, UkKeyEvName.bowl.rawValue:
+                 ret = processHook(ev)
+             case UkKeyEvName.dd.rawValue:
+                 ret = processDd(ev)
+             case UkKeyEvName.tone0.rawValue...UkKeyEvName.tone5.rawValue:
+                 ret = processTone(ev)
+             case UkKeyEvName.telex_w.rawValue:
+                 ret = processTelexW(ev)
+             case UkKeyEvName.mapChar.rawValue:
+                 ret = processMapChar(ev)
+             case UkKeyEvName.escChar.rawValue:
+                 ret = processEscChar(ev)
+             default:
+                 ret = processAppend(ev)
             }
-
-            // Reposition tone if needed
-            // Logic ported from x-unikey ukengine.cpp processAppend (lines 1597-1608)
-            let oldSeqLen = vowelSeqList[prev.vseq.rawValue].length
-            let oldVStart = current - 1 - (oldSeqLen - 1)
-            let oldTonePos = oldVStart + getTonePosition(prev.vseq, terminated: true)
-
-            if oldTonePos >= 0 && oldTonePos < current && buffer[oldTonePos].tone != 0 {
-              let tone = buffer[oldTonePos].tone
-              let newTonePos = vStart + getTonePosition(newSeq, terminated: false)
-
-              if newTonePos != oldTonePos {
-                buffer[newTonePos].tone = tone
-                buffer[oldTonePos].tone = 0
-              }
-            }
-          } else {
-            // Can't extend, start new
-            info.form = .v
-            info.vOffset = 0
-            info.vseq = lookupVowelSeq(event.vnSymbol.baseChar)
-            if info.vseq == .none { info.form = .nonVn }
-          }
-        } else if prev.form == .c {
-          // After consonant (initial)
-          info.form = .cv
-          info.c1Offset = prev.c1Offset + 1
-          info.vOffset = 0
-          info.vseq = lookupVowelSeq(event.vnSymbol.baseChar)
-        } else if prev.form == .cvc || prev.form == .vc {
-          // After ending consonant -> CVC + V is invalid
-          info.form = .nonVn
         } else {
-          info.form = .v
-          info.vOffset = 0
-          info.vseq = lookupVowelSeq(event.vnSymbol.baseChar)
-        }
-      }
-    } else if event.vnSymbol != .nonVnChar {
-      // Consonant
-      if current == 0 {
-        info.form = .c
-        info.c1Offset = 0
-        info.cseq = lookupConsonantSeq(event.vnSymbol.baseChar)
-        if info.cseq == .none { info.form = .nonVn }
-      } else {
-        let prev = buffer[current - 1]
-
-        if prev.vOffset >= 0 {
-          if prev.form == .v || prev.form == .cv {
-            // Start NEW ending consonant
-            info.form = (prev.form == .cv) ? .cvc : .vc
-            info.c1Offset = 0
-            info.vOffset = prev.vOffset + 1
-            info.c2Offset = 0
-
-            info.cseq = lookupConsonantSeq(event.vnSymbol.baseChar)
-
-            if info.cseq == .none {
-              info.form = .nonVn
-            }
-          } else if prev.form == .vc || prev.form == .cvc {
-            // Extend EXISTING ending consonant
-            let existingLen = consonantSeqList[prev.cseq.rawValue].length
-            var newSeq: ConsonantSequence = .none
-
-            let ecStart = current - existingLen
-
-            // Validate bounds just in case
-            if ecStart >= 0 {
-              if existingLen == 1 {
-                newSeq = lookupConsonantSeq(buffer[ecStart].vnSym.baseChar, event.vnSymbol.baseChar)
-              } else if existingLen == 2 {
-                if ecStart + 1 < current {
-                  newSeq = lookupConsonantSeq(
-                    buffer[ecStart].vnSym.baseChar, buffer[ecStart + 1].vnSym.baseChar,
-                    event.vnSymbol.baseChar)
-                }
-              }
-            }
-
-            if newSeq != .none {
-              info.form = prev.form
-              info.c1Offset = (prev.c1Offset >= 0) ? prev.c1Offset + 1 : -1
-              info.vOffset = prev.vOffset + 1
-              info.cseq = newSeq
+            m_toEscape = false
+            if m_current < 0 || ev.evType == UkKeyEvName.normal.rawValue || ev.evType == UkKeyEvName.escChar.rawValue {
+                ret = processAppend(ev)
             } else {
-              info.form = .nonVn
-              info.cseq = .none
+                m_current -= 1
+                ret = processAppend(ev)
+                markChange(m_current)
+                ret = 1
             }
-            print("Processing: \(event.vnSymbol), NewSeq: \(newSeq), Form: \(info.form)")
-          } else {
-            info.form = .nonVn
-          }
-        } else if prev.c1Offset >= 0 {
-          // Extend consonant sequence
-          let cStart = current - 1 - prev.c1Offset
-          let existingLen = consonantSeqList[prev.cseq.rawValue].length
-
-          var newSeq: ConsonantSequence = .none
-          if existingLen == 1 {
-            newSeq = lookupConsonantSeq(buffer[cStart].vnSym.baseChar, event.vnSymbol.baseChar)
-          } else if existingLen == 2 {
-            newSeq = lookupConsonantSeq(
-              buffer[cStart].vnSym.baseChar,
-              buffer[cStart + 1].vnSym.baseChar,
-              event.vnSymbol.baseChar)
-          }
-
-          if newSeq != .none {
-            info.form = .c
-            info.c1Offset = current - cStart
-            info.cseq = newSeq
-          } else {
-            info.form = .nonVn
-            info.c1Offset = 0
-            info.cseq = .none
-          }
-        } else {
-          info.form = .c
-          info.c1Offset = 0
-          info.cseq = lookupConsonantSeq(event.vnSymbol.baseChar)
-          if info.cseq == .none { info.form = .nonVn }
         }
-      }
-    } else {
-      info.form = .nonVn
-    }
 
-    buffer[current] = info
-
-    // Mark as converted if we successfully formed a VN struct
-    // Simple heuristic: if form is c/v/cv/vc/cvc, we are "consuming".
-    // Actually, track if we changed anything PREVIOUSLY.
-    // But for "refactor": f -> tone. That was a conversion.
-    // "a" here is just a letter.
-
-    keyStrokes.append(keyEntry)
-
-    // CHECK VALIDITY
-    if spellCheckEnabled && !restoring && current > 0 {
-      let prev = buffer[current - 1]
-      let curr = buffer[current]
-
-      // If we started a NEW component that is disconnected from previous
-      // (e.g. prev was part of a word, but curr starts a new C or V with offset 0/checking back)
-      // AND the previous part had some "conversion"
-
-      var disconnected = false
-      if curr.form == .c && curr.c1Offset == 0 { disconnected = true }  // New consonant
-      if curr.form == .v && curr.vOffset == 0 && curr.c1Offset == -1 { disconnected = true }  // New vowel (standalone)
-      if curr.form == .nonVn { disconnected = true }  // Broken word structure
-
-      if disconnected {
-        // We have a disconnect.
-        // Check if we have any converted keys in the buffer
-        // If so, and we just broke the word structure -> Restore.
-
-        if hasConvertedKeys() {
-          return restoreKeyStrokes()
+        if ctrl.vietKey != 0 &&
+            m_current >= 0 && m_buffer[m_current].form == .nonVn &&
+            ev.chType == .vn &&
+            (!ctrl.options.spellCheckEnabled || m_singleMode) {
+             ret = processNoSpellCheck(ev)
         }
-      }
-    }
 
-    result.output = String(event.vnSymbol.toUnicode)
-    result.handled = true
-    return result
-  }
-
-  private func hasConvertedKeys() -> Bool {
-    // In a real implementation, we'd mark specific keys.
-    // For now: assume if we are strictly in VN mode, any tone/mark is a conversion.
-    // Scan buffer for anything not matching original key?
-    // Or check if current structure is complex.
-
-    // Let's rely on `restoreKeyStrokes` to do the heavy lifting of checking 'is this worth restoring'.
-    // But we need a trigger.
-    // Trigger: Disconnected components in buffer.
-    return true  // Simplified: always check restore if disconnected?
-    // "vietnam" -> v, i, e, t, n, a, m. All disconnected?
-    // v (c), i (v), e (v - extend? ie), t (c - extend? iet).
-    // n (c - new).
-    // "viet" is one word. "n" breaks it.
-    // "vietnam" is valid typing. We don't want to restore "việt nam" to "vietnam" unless "n" is invalid start?
-
-    // The issue with "refactor" is "rè" is valid, but "a" following it is weird.
-    // "n" following "t" is valid (new word).
-    // "a" following "e" (with tone) is invalid?
-    // Actually "rè" ends with vowel. "a" is vowel.
-    // Vowel following Vowel (that didn't merge) is almost always invalid in VN (unless space).
-  }
-
-  /// Restore original keystrokes
-  private func restoreKeyStrokes() -> ProcessResult {
-    var result = ProcessResult()
-
-    // Calculate backspaces: everything currently in buffer output
-    // We can use current buffer content length or simply `current + 1` chars?
-    // Wait, output might have been multi-char (ư, ơ, ê...).
-    // We need to know how much we outputted.
-    // Currently `processAppend` returns 1 char output usually.
-    // But we have `current` pointer.
-
-    // Using a simplified approach:
-    // 1. Calculate length of current VN string in buffer to backspace.
-    //    (Iterate buffer 0..<current and count unicode length)
-    //    Note: current char is in buffer but NOT yet outputted, so don't backspace it.
-    //    We only backspace what was previously outputted (0 to current-1).
-    var toDelete = 0
-    if current > 0 {
-      for i in 0..<current {
-        let char = buffer[i].vnSym.toUnicode
-        toDelete += String(char).count
-      }
-    } else if current == 0 {
-      // If current is 0, nothing to backspace?
-      // If 0 is the NEW char, then 0 chars backspace.
-      toDelete = 0
-    }
-
-    // 2. Capture current keystrokes to replay
-    let keysToReplay = keyStrokes
-
-    // 3. Reset Engine to clear state
-    reset()
-
-    // 4. Replay keys
-    // This repopulates the buffer with exact characters.
-    // Since we call processAppend directly, tones/marks become plain chars.
-    // If a sequence is invalid (e.g. refa), processAppend should eventually mark .nonVn
-
-    restoring = true
-    var original = ""
-
-    for var k in keysToReplay {
-      k.isConverted = false
-      // We need to convert KeyBufEntry back to KeyEvent to append
-      // Using simplified conversion assumes 1-1 mapping or we use the char
-      // But keyBufEntry has keyCode.
-      let ev = inputProcessor.keyCodeToEvent(k.keyCode, char: k.char)
-      _ = processAppend(ev)
-      original.append(k.char)
-    }
-    restoring = false
-
-    result.backspaceCount = toDelete
-    result.output = original
-    result.handled = true
-
-    return result
-  }
-
-  /// Process tone mark
-  private func processTone(_ event: KeyEvent) -> ProcessResult {
-    var result = ProcessResult()
-
-    // Must have a vowel to add tone
-    guard current >= 0, let vRange = getVowelRange(at: current) else {
-      return processAppend(event)
-    }
-
-    let vStart = vRange.start
-    let vEnd = vRange.end
-    let vs = buffer[vEnd].vseq
-    guard vs != .none, let info = getVowelSeqInfo(vs) else {
-      return processAppend(event)
-    }
-
-    // Record Key (consumed as Tone)
-    recordKey(event)
-
-    let newTone = event.tone
-
-    // Find tone position (use Vietnamese tone placement rules)
-    let tonePos = vStart + getTonePosition(vs, terminated: vEnd == current)
-
-    guard tonePos >= 0 && tonePos < maxEngineBuffer else {
-      return processAppend(event)
-    }
-
-    let oldTone = buffer[tonePos].tone
-
-    // If same tone, remove it (toggle behavior)
-    if oldTone == newTone && newTone != 0 {
-      buffer[tonePos].tone = 0
-      result = rewriteBuffer(from: tonePos)
-      singleMode = true
-    } else {
-      // Clear old tone from other positions
-      for i in vStart...vEnd {
-        if buffer[i].tone != 0 && i != tonePos {
-          buffer[i].tone = 0
+        if m_current >= 0 {
+            ev.chType = ctrl.input.getCharType(ev.keyCode)
+            m_keyCurrent += 1
+            if m_keyCurrent < MAX_UK_ENGINE {
+                m_keyStrokes[m_keyCurrent].ev = ev
+                m_keyStrokes[m_keyCurrent].converted = (ret != 0 && !m_keyRestored)
+            }
         }
-      }
 
-      buffer[tonePos].tone = newTone
-      result = rewriteBuffer(from: tonePos)
-    }
-
-    result.handled = true
-    return result
-  }
-
-  /// Process roof (^) mark
-  private func processRoof(_ event: KeyEvent) -> ProcessResult {
-    var result = ProcessResult()
-
-    guard current >= 0, let vRange = getVowelRange(at: current) else {
-      return processAppend(event)
-    }
-
-    let vStart = vRange.start
-    let vEnd = vRange.end
-    let vs = buffer[vEnd].vseq
-    guard vs != .none, let vInfo = getVowelSeqInfo(vs) else {
-      return processAppend(event)
-    }
-
-    // Determine target based on event type
-    let targetBase: VnLexiName?
-    switch event.eventType {
-    case .roof_a: targetBase = .ar
-    case .roof_e: targetBase = .er
-    case .roof_o: targetBase = .or
-    default: targetBase = nil
-    }
-
-    // Check if roof can be added or removed
-    if vInfo.roofPosition >= 0 {
-      // Already has roof - remove it
-      let roofPos = vStart + vInfo.roofPosition
-
-      // Verify target matches if specified
-      if let target = targetBase, buffer[roofPos].vnSym.baseChar != target {
-        return processAppend(event)
-      }
-
-      if !freeMarking && roofPos != current {
-        return processAppend(event)
-      }
-
-      // Remove roof
-      buffer[roofPos].vnSym = buffer[roofPos].vnSym.withoutRoof
-
-      // Update vowel sequence
-      if let newVs = vInfo.withRoof == .none ? nil : vInfo.withRoof {
-        updateVowelSequence(vStart: vStart, newSeq: newVs)
-      }
-
-      result = rewriteBuffer(from: roofPos)
-      singleMode = true
-    } else if vInfo.withRoof != .none {
-      // Can add roof
-      let newVs = vInfo.withRoof
-      guard let newInfo = getVowelSeqInfo(newVs) else {
-        return processAppend(event)
-      }
-
-      // Verify target matches if specified
-      if let target = targetBase, newInfo.vowels[newInfo.roofPosition] != target {
-        return processAppend(event)
-      }
-
-      let changePos = vStart + newInfo.roofPosition
-
-      if !freeMarking && changePos != current {
-        return processAppend(event)
-      }
-
-      // Add roof
-      buffer[changePos].vnSym = buffer[changePos].vnSym.withRoof
-      updateVowelSequence(vStart: vStart, newSeq: newVs)
-
-      result = rewriteBuffer(from: changePos)
-    } else {
-      return processAppend(event)
-    }
-
-    recordKey(event)
-    result.handled = true
-    return result
-  }
-
-  /// Process hook/horn mark (ư, ơ, ă)
-  private func processHook(_ event: KeyEvent) -> ProcessResult {
-    var result = ProcessResult()
-
-    guard current >= 0, let vRange = getVowelRange(at: current) else {
-      return processAppend(event)
-    }
-
-    let vStart = vRange.start
-    let vEnd = vRange.end
-    let vs = buffer[vEnd].vseq
-    guard vs != .none, let info = getVowelSeqInfo(vs) else {
-      return processAppend(event)
-    }
-
-    // Check for special UO hook handling (uo, uo^, uo^i...)
-    // Ported from x-unikey ukengine.cpp processHook (lines 800-804)
-    if getVowelSeqLength(vs) > 1 && event.eventType != .bowl
-      && (info.vowels.count > 0 && (info.vowels[0] == .u || info.vowels[0] == .uh))
-      && (info.vowels.count > 1
-        && (info.vowels[1] == .o || info.vowels[1] == .oh || info.vowels[1] == .or))
-    {
-
-      // Special handling: processHookWithUO needs to record key if it handles it.
-      // But processHookWithUO signature doesn't imply fallback easily.
-      // We'll record here, but pop if processHookWithUO fails (if it calls processAppend).
-      // Actually processHookWithUO in this port calls processAppend internally.
-      // So assuming processHookWithUO handles recording or we record if successful?
-      // Wait, did I add recordKey to processHookWithUO? No.
-      // So we should record here.
-      recordKey(event)
-      return processHookWithUO(event, vRange: vRange)
-    }
-
-    // Original logic continues here, using `info` (which is `vInfo` from original code)
-    if info.hookPosition >= 0 {
-      // Already has hook - remove it
-      let hookPos = vStart + info.hookPosition
-
-      if !freeMarking && hookPos != current {
-        return processAppend(event)
-      }
-
-      buffer[hookPos].vnSym = buffer[hookPos].vnSym.withoutHook
-
-      result = rewriteBuffer(from: hookPos)
-      singleMode = true
-    } else if info.withHook != .none {
-      // Can add hook
-      let newVs = info.withHook
-      guard let newInfo = getVowelSeqInfo(newVs) else {
-        return processAppend(event)
-      }
-
-      let changePos = vStart + newInfo.hookPosition
-
-      if !freeMarking && changePos != current {
-        return processAppend(event)
-      }
-
-      buffer[changePos].vnSym = buffer[changePos].vnSym.withHook
-      updateVowelSequence(vStart: vStart, newSeq: newVs)
-
-      result = rewriteBuffer(from: changePos)
-    } else {
-      return processAppend(event)
-    }
-
-    recordKey(event)
-    result.handled = true
-    return result
-  }
-
-  /// Process Đ
-  private func processDd(_ event: KeyEvent) -> ProcessResult {
-    var result = ProcessResult()
-
-    // Look for 'd' in the buffer
-    guard current >= 0 else {
-      return processAppend(event)
-    }
-
-    // Check current consonant position
-    var dPos = -1
-
-    if buffer[current].c1Offset >= 0 {
-      let cStart = current - buffer[current].c1Offset
-      if buffer[cStart].vnSym.baseChar == .d || buffer[cStart].vnSym.baseChar == .D {
-        dPos = cStart
-      }
-    }
-
-    // Also check if current is vowel, look at c1
-    if dPos < 0 && current > 0 && buffer[current].vOffset >= 0 && buffer[current].c1Offset >= 0 {
-      let cStart = current - buffer[current].c1Offset
-      if buffer[cStart].vnSym.baseChar == .d || buffer[cStart].vnSym.baseChar == .D {
-        dPos = cStart
-      }
-    }
-
-    if dPos >= 0 {
-      // Toggle đ/d
-      let curSym = buffer[dPos].vnSym
-      if curSym == .d {
-        buffer[dPos].vnSym = .dd
-      } else if curSym == .D {
-        buffer[dPos].vnSym = .DD
-      } else if curSym == .dd {
-        buffer[dPos].vnSym = .d
-        singleMode = true
-      } else if curSym == .DD {
-        buffer[dPos].vnSym = .D
-        singleMode = true
-      }
-
-      result = rewriteBuffer(from: dPos)
-      result.handled = true
-      recordKey(event)
-    } else {
-      return processAppend(event)
-    }
-
-    return result
-  }
-
-  /// Process Telex W key
-  private func processTelexW(_ event: KeyEvent) -> ProcessResult {
-    // W in Telex can:
-    // 1. Add ư if after u
-    // 2. Add ơ if after o
-    // 3. Add ă if standalone or after a
-
-    guard current >= 0, buffer[current].vOffset >= 0 else {
-      return processAppend(event)
-    }
-
-    // Try hook first
-    // Telex W acts as hook_uo (like VNI 7, not just hookAll)
-    // allowing uo -> ươ conversion
-    let hookResult = processHook(
-      KeyEvent(eventType: .hook_uo, charType: .vn, vnSymbol: .w, keyCode: event.keyCode))
-
-    if hookResult.handled && !hookResult.output.isEmpty {
-      return hookResult
-    }
-
-    // Fall back to append
-    return processAppend(event)
-  }
-
-  // MARK: - Helper Methods
-
-  /// Get vowel sequence length helper
-  private func getVowelSeqLength(_ vs: VowelSequence) -> Int {
-    return getVowelSeqInfo(vs)?.length ?? 0
-  }
-
-  /// Process hook with UO special handling
-  /// Ported from x-unikey ukengine.cpp processHookWithUO
-  private func processHookWithUO(_ event: KeyEvent, vRange: (start: Int, end: Int)) -> ProcessResult
-  {
-    var result = ProcessResult()
-    _ = result  // Suppress unused warning or just use empty result init
-
-    let vStart = vRange.start
-    let vEnd = vRange.end
-    let vs = buffer[vEnd].vseq
-
-    guard let info = getVowelSeqInfo(vs) else { return processAppend(event) }
-    let v = info.vowels
-
-    var newVs: VowelSequence = .none
-    var changeIndices: [Int] = []
-    var newSyms: [VnLexiName] = []
-
-    // Logic to determine new sequence
-    switch event.eventType {
-    case .hook_u:
-      if v[0] == .u {
-        newVs = info.withHook
-        changeIndices = [0]
-        newSyms = [.uh]
-      } else {  // v[0] == .uh -> uo
-        let v3 = v.count > 2 ? v[2] : .nonVnChar
-        newVs = lookupVowelSeq(.u, .o, v3)
-        changeIndices = [0, 1]
-        newSyms = [.u, .o]
-      }
-
-    case .hook_o:
-      let v1 = v[1]
-      if v1 == .o || v1 == .or {
-        // Check for o|o^ -> o+ (th + cv case skipped for simplicity or check?)
-        // Unikey checks for "th" preceding... lets implement basic first
-        let v3 = v.count > 2 ? v[2] : .nonVnChar
-        newVs = lookupVowelSeq(.uh, .oh, v3)  // uh oh
-        if v[0] == .u {
-          changeIndices = [0, 1]
-          newSyms = [.uh, .oh]
-        } else {
-          changeIndices = [1]
-          newSyms = [.oh]
+        if ret == 0 {
+            backs = 0
+            outSize = 0
+            outType = m_outType
+            return 0
         }
-      } else {  // v[1] == .oh -> uo
-        let v3 = v.count > 2 ? v[2] : .nonVnChar
-        newVs = lookupVowelSeq(.u, .o, v3)
-        changeIndices = [0, 1]
-        newSyms = [.u, .o]
-      }
 
-    case .hook_uo:  // Telex W, VNI 7
-      // Toggle uo <-> ươ
-      if v[0] == .uh && v[1] == .oh {  // ươ -> uo
-        let v3 = v.count > 2 ? v[2] : .nonVnChar
-        newVs = lookupVowelSeq(.u, .o, v3)
-        changeIndices = [0, 1]
-        newSyms = [.u, .o]
-      } else if v[0] == .u && v[1] == .o {  // uo -> ươ
-        let v3 = v.count > 2 ? v[2] : .nonVnChar
-        newVs = lookupVowelSeq(.uh, .oh, v3)
-        changeIndices = [0, 1]
-        newSyms = [.uh, .oh]
-      }
+        backs = m_backs
+        if !m_outputWritten {
+            writeOutput()
+        }
+        outType = m_outType
+        outBuf.append(contentsOf: m_outBuf)
+        outSize = outBuf.count
 
-    case .hookAll:
-      // Try hook_uo logic first
-      if v[0] == .u && v[1] == .o {
-        let v3 = v.count > 2 ? v[2] : .nonVnChar
-        newVs = lookupVowelSeq(.uh, .oh, v3)
-        changeIndices = [0, 1]
-        newSyms = [.uh, .oh]
-      }
-    // Fallback to table if needed?
-
-    default:
-      break
+        return ret
     }
 
-    if newVs == .none {
-      // Fallback to standard hook
-      // But verify if standard hook is acceptable (not already handled)
-      return processAppend(event)
-    }
+    public func processBackspace(_ backs: inout Int, _ outBuf: inout [UInt16], _ outSize: inout Int, _ outType: inout UkOutputType) -> Int {
+        outType = .normal
+        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0 else {
+            backs = 0
+            outSize = 0
+            return 0
+        }
 
-    // Apply changes
-    if !freeMarking && vEnd != current {
-      return processAppend(event)
-    }
+        m_backs = 0
+        m_outBuf = []
+        m_changePos = m_current + 1
+        markChange(m_current)
 
-    // Update symbols
-    for (i, idx) in changeIndices.enumerated() {
-      let pos = vStart + idx
-      buffer[pos].vnSym = newSyms[i]
-      // Reset tone on changed chars? Unikey does sophisticated tone restoration.
-      // For now, let's keep it simple: if symbols change, tone might need reset.
-      // Unikey clears tone if it moves or changes significantly.
-      // Let's implement basic tone preservation if possible?
-      // Unikey: if removing hook/roof, keeps tone. If adding, keeps tone.
-      // processHookWithUO in C++ handles tone removal/move carefully.
-      // For simplicity: keep tone on index if valid.
-    }
+        if m_current == 0 ||
+            m_buffer[m_current].form == .empty ||
+            m_buffer[m_current].form == .nonVn ||
+            m_buffer[m_current].form == .c ||
+            m_buffer[m_current-1].form == .c ||
+            m_buffer[m_current-1].form == .cvc ||
+            m_buffer[m_current-1].form == .vc {
 
-    updateVowelSequence(vStart: vStart, newSeq: newVs)
+            m_current -= 1
+            backs = m_backs
+            outSize = 0
+            synchKeyStrokeBuffer()
+            return (backs > 1) ? 1 : 0
+        }
 
-    // Reposition tone (critical for ươ case)
-    let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == current)
-    // Find where tone was
-    // ... basic logic: scan range, find tone, move to newTonePos
-    var foundTone = 0
-    for i in vStart...vEnd {
-      if buffer[i].tone != 0 {
-        foundTone = buffer[i].tone
-        buffer[i].tone = 0
-      }
-    }
-    if foundTone != 0 {
-      buffer[newTonePos].tone = foundTone
-    }
+        let vEnd = m_current - m_buffer[m_current].vOffset
+        let vs = m_buffer[vEnd].vseq
+        guard let vsInfo = getVowelSeqInfo(vs) else { return 0 }
+        let vStart = vEnd - vsInfo.length + 1
+        let newVs = m_buffer[m_current-1].vseq
 
-    return rewriteBuffer(from: vStart)
-  }
+        let curTonePos = vStart + getTonePosition(vs, terminated: vEnd == m_current)
+        let newTonePos = vStart + getTonePosition(newVs, terminated: true)
 
-  /// Get tone position within vowel sequence (Vietnamese rules)
-  private func getVowelRange(at index: Int) -> (start: Int, end: Int)? {
-    guard index >= 0 && index < maxEngineBuffer else { return nil }
+        let tone = m_buffer[curTonePos].tone
 
-    // Check if we have valid vowel info
-    guard buffer[index].vOffset >= 0 else { return nil }
+        if tone == 0 || curTonePos == newTonePos || (curTonePos == m_current && m_buffer[m_current].tone != 0) {
+            m_current -= 1
+            backs = m_backs
+            outSize = 0
+            synchKeyStrokeBuffer()
+            return (backs > 1) ? 1 : 0
+        }
 
-    let vStart = index - buffer[index].vOffset
-    guard vStart >= 0 else { return nil }
+        markChange(newTonePos)
+        m_buffer[newTonePos].tone = tone
+        markChange(curTonePos)
+        m_buffer[curTonePos].tone = 0
+        m_current -= 1
+        synchKeyStrokeBuffer()
 
-    // Use stored vseq length if possible, or scan forward
-    // Since we maintain vseq in the last vowel character, scanning is reliable
-    var vEnd = vStart
-    while vEnd + 1 <= current && buffer[vEnd + 1].vnSym.isVowel {
-      vEnd += 1
-    }
+        backs = m_backs
+        writeOutput()
+        outBuf.append(contentsOf: m_outBuf)
+        outSize = outBuf.count
 
-    return (vStart, vEnd)
-  }
-
-  /// Get tone position within vowel sequence (Vietnamese rules)
-  /// Get tone position within vowel sequence (Vietnamese rules)
-  /// Ported from x-unikey ukengine.cpp getTonePosition
-  private func getTonePosition(_ vs: VowelSequence, terminated: Bool) -> Int {
-    guard let info = getVowelSeqInfo(vs) else { return 0 }
-
-    if info.length == 1 {
-      return 0
-    }
-
-    if info.roofPosition != -1 {
-      return info.roofPosition
-    }
-
-    if info.hookPosition != -1 {
-      // Special cases: u+o+, u+o+u, u+o+i -> tone on 2nd char (o)
-      // In our table: uhoh, uhohi, uhohu
-      if vs == .uhoh || vs == .uhohi || vs == .uhohu {
         return 1
-      }
-      return info.hookPosition
     }
 
-    if info.length == 3 {
-      return 1
+    public func restoreKeyStrokes(_ backs: inout Int, _ outBuf: inout [UInt16], _ outSize: inout Int, _ outType: inout UkOutputType) -> Int {
+        outType = .normal // UkKeyOutput in C++? C++ says UkKeyOutput but defines normal=0.
+        // Actually C++ sets outType = UkKeyOutput. I only have .normal.
+        // I should add .keyOutput to UkOutputType if needed, or just use normal.
+
+        if !lastWordHasVnMark() {
+            backs = 0
+            outSize = 0
+            return 0
+        }
+
+        m_backs = 0
+        m_changePos = m_current + 1
+
+        var keyStart = m_keyCurrent
+        var converted = false
+
+        while keyStart >= 0 && m_keyStrokes[keyStart].ev.chType != .wordBreak {
+            if m_keyStrokes[keyStart].converted {
+                converted = true
+            }
+            keyStart -= 1
+        }
+        keyStart += 1
+
+        if !converted {
+            backs = 0
+            outSize = 0
+            return 0
+        }
+
+        while m_current >= 0 && m_buffer[m_current].form != .empty {
+            m_current -= 1
+        }
+        markChange(m_current + 1)
+        backs = m_backs
+
+        m_outBuf = []
+        m_keyRestoring = true
+
+        var ev = UkKeyEvent()
+        if m_keyCurrent >= keyStart {
+            for i in keyStart...m_keyCurrent {
+                // C++: outBuf[count++] = keyCode
+                // In Swift we append to m_outBuf? No, outBuf arg.
+                // But `restoreKeyStrokes` signature returns `outBuf`.
+                // We should append RAW keys to output.
+                m_outBuf.append(UInt16(m_keyStrokes[i].ev.keyCode))
+
+                guard let ctrl = m_pCtrl else { continue }
+                ctrl.input.keyCodeToSymbol(m_keyStrokes[i].ev.keyCode, &ev)
+                m_keyStrokes[i].converted = false
+                _ = processAppend(ev)
+            }
+        }
+
+        m_keyRestoring = false
+
+        // Output is raw keys, not processed string?
+        // C++: outBuf gets keyCodes.
+        // My implementation of process puts processed chars in m_outBuf.
+        // But here we want raw keys.
+        // `m_outBuf` was filled with raw keys above.
+        // Wait, `processAppend` inside loop might update `m_buffer` but we don't call `writeOutput`.
+        // Correct.
+
+        outBuf.append(contentsOf: m_outBuf)
+        outSize = m_outBuf.count
+
+        return 1
     }
 
-    // Modern style check (always enabled for now)
-    // oa, oe, uy -> tone on 2nd char
-    if vs == .oa || vs == .oe || vs == .uy {
-      return 1
+    private func lastWordHasVnMark() -> Bool {
+        var i = m_current
+        while i >= 0 && m_buffer[i].form != .empty {
+            let sym = m_buffer[i].vnSym
+            if sym != .nonVnChar {
+                if sym.isVowel && m_buffer[i].tone != 0 {
+                    return true
+                }
+                // Check if sym is different from root
+                // VnLexiName.baseChar gives root.
+                if sym != sym.baseChar {
+                    return true
+                }
+            }
+            i -= 1
+        }
+        return false
     }
 
-    return terminated ? 0 : 1
-  }
+    private func lastWordIsNonVn() -> Bool {
+        if m_current < 0 { return false }
 
-  /// Update vowel sequence in buffer
-  private func updateVowelSequence(vStart: Int, newSeq: VowelSequence) {
-    guard let info = getVowelSeqInfo(newSeq) else { return }
+        switch m_buffer[m_current].form {
+        case .nonVn: return true
+        case .empty, .c: return false
+        case .v, .cv:
+            if let info = getVowelSeqInfo(m_buffer[m_current].vseq) {
+                return !info.complete
+            }
+            return true
+        case .vc, .cvc:
+            let vIndex = m_current - m_buffer[m_current].vOffset
+            let vs = m_buffer[vIndex].vseq
+            guard let vsInfo = getVowelSeqInfo(vs) else { return true }
+            if !vsInfo.complete { return true }
 
-    for i in 0..<info.length {
-      if vStart + i < maxEngineBuffer {
-        buffer[vStart + i].vseq = info.subsequences[i]
-      }
+            let cs = m_buffer[m_current].cseq
+            var c1: ConsonantSequence = .none
+            if m_buffer[m_current].c1Offset != -1 {
+                c1 = m_buffer[m_current - m_buffer[m_current].c1Offset].cseq
+            }
+
+            if !isValidCVC(c1, vs, cs) { return true }
+
+            let tonePos = (vIndex - vsInfo.length + 1) + getTonePosition(vs, terminated: false)
+            let tone = m_buffer[tonePos].tone
+            if (cs == .c || cs == .ch || cs == .p || cs == .t) && (tone == 2 || tone == 3 || tone == 4) {
+                return true
+            }
+        }
+        return false
     }
-  }
 
-  /// Rewrite buffer from a position onwards
-  private func rewriteBuffer(from pos: Int) -> ProcessResult {
-    var result = ProcessResult()
+    // MARK: - Internal Logic
 
-    // Count characters to delete (from pos to current)
-    result.backspaceCount = current - pos + 1
-
-    // Build output string
-    var output = ""
-    for i in pos...current {
-      var sym = buffer[i].vnSym
-
-      // Apply tone if present
-      if buffer[i].tone > 0 && sym.isVowel {
-        sym = sym.withTone(buffer[i].tone)
-      }
-
-      output.append(sym.toUnicode)
+    private func resetKeyBuf() {
+        m_keyCurrent = -1
     }
 
-    result.output = output
-    result.handled = true
-    return result
-  }
+    private func checkEscapeVIQR(_ ev: UkKeyEvent) -> Int {
+        if m_current < 0 { return 0 }
+        let entry = m_buffer[m_current]
+        var escape = false
+
+        if entry.form == .v || entry.form == .cv {
+            switch ev.keyCode {
+            case 94: // ^
+                escape = (entry.vnSym == .a || entry.vnSym == .o || entry.vnSym == .e)
+            case 40: // (
+                escape = (entry.vnSym == .a)
+            case 43: // +
+                escape = (entry.vnSym == .o || entry.vnSym == .u)
+            case 39, 96, 63, 126, 46: // ' ` ? ~ .
+                escape = (entry.tone == 0)
+            default: break
+            }
+        } else if entry.form == .nonVn {
+             let ch = Charset.toUpper(Character(UnicodeScalar(entry.keyCode) ?? " "))
+             // Check...
+             // Simplified
+        }
+
+        if escape {
+            // ...
+        }
+        return 0
+    }
+
+    private func processWordEnd(_ ev: UkKeyEvent) -> Int {
+        guard let ctrl = m_pCtrl else { return 0 }
+        if ctrl.options.macroEnabled && macroMatch(ev) != 0 {
+            return 1
+        }
+
+        if !ctrl.options.spellCheckEnabled || m_singleMode || m_current < 0 || m_keyRestoring {
+            m_current += 1
+            var entry = WordInfo()
+            entry.form = .empty
+            entry.keyCode = ev.keyCode
+            entry.vnSym = ev.vnSym.toLower
+            entry.caps = (entry.vnSym != ev.vnSym)
+            m_buffer[m_current] = entry
+            return 0
+        }
+
+        // Restore logic...
+
+        m_current += 1
+        var entry = WordInfo()
+        entry.form = .empty
+        entry.keyCode = ev.keyCode
+        entry.vnSym = ev.vnSym.toLower
+        entry.caps = (entry.vnSym != ev.vnSym)
+        m_buffer[m_current] = entry
+
+        return 0
+    }
+
+    private func macroMatch(_ ev: UkKeyEvent) -> Int {
+        return 0
+    }
+
+    private func processTone(_ ev: UkKeyEvent) -> Int {
+        guard let ctrl = m_pCtrl, m_current >= 0, ctrl.vietKey != 0 else {
+            return processAppend(ev)
+        }
+
+        if m_buffer[m_current].form == .c && (m_buffer[m_current].cseq == .gi || m_buffer[m_current].cseq == .gin) {
+            let p = (m_buffer[m_current].cseq == .gi) ? m_current : m_current - 1
+            if m_buffer[p].tone == 0 && ev.tone == 0 {
+                return processAppend(ev)
+            }
+            markChange(p)
+            if m_buffer[p].tone == ev.tone {
+                m_buffer[p].tone = 0
+                m_singleMode = false
+                _ = processAppend(ev)
+                m_reverted = true
+                return 1
+            }
+            m_buffer[p].tone = ev.tone
+            return 1
+        }
+
+        if m_buffer[m_current].vOffset < 0 {
+            return processAppend(ev)
+        }
+
+        let vEnd = m_current - m_buffer[m_current].vOffset
+        let vs = m_buffer[vEnd].vseq
+        guard let info = getVowelSeqInfo(vs) else { return processAppend(ev) }
+
+        if ctrl.options.spellCheckEnabled && !ctrl.options.freeMarking && !info.complete {
+            return processAppend(ev)
+        }
+
+        if m_buffer[m_current].form == .vc || m_buffer[m_current].form == .cvc {
+            let cs = m_buffer[m_current].cseq
+            if (cs == .c || cs == .ch || cs == .p || cs == .t) && (ev.tone == 2 || ev.tone == 3 || ev.tone == 4) {
+                return processAppend(ev)
+            }
+        }
+
+        let toneOffset = getTonePosition(vs, terminated: vEnd == m_current)
+        let tonePos = vEnd - (info.length - 1) + toneOffset
+
+        if m_buffer[tonePos].tone == 0 && ev.tone == 0 {
+            return processAppend(ev)
+        }
+
+        if m_buffer[tonePos].tone == ev.tone {
+            markChange(tonePos)
+            m_buffer[tonePos].tone = 0
+            m_singleMode = false
+            _ = processAppend(ev)
+            m_reverted = true
+            return 1
+        }
+
+        markChange(tonePos)
+        m_buffer[tonePos].tone = ev.tone
+        return 1
+    }
+
+    private func processRoof(_ ev: UkKeyEvent) -> Int {
+        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0, m_buffer[m_current].vOffset >= 0 else {
+            return processAppend(ev)
+        }
+
+        var target: VnLexiName = .nonVnChar
+        switch ev.evType {
+        case UkKeyEvName.roof_a.rawValue: target = .ar
+        case UkKeyEvName.roof_e.rawValue: target = .er
+        case UkKeyEvName.roof_o.rawValue: target = .or
+        default: break
+        }
+
+        let vEnd = m_current - m_buffer[m_current].vOffset
+        let vs = m_buffer[vEnd].vseq
+        guard let info = getVowelSeqInfo(vs) else { return processAppend(ev) }
+        let vStart = vEnd - (info.length - 1)
+
+        let curTonePos = vStart + getTonePosition(vs, terminated: vEnd == m_current)
+        let tone = m_buffer[curTonePos].tone
+
+        var newVs: VowelSequence = .none
+        var doubleChangeUO = false
+
+        if vs == .uho || vs == .uhoh || vs == .uhoi || vs == .uhohi {
+            newVs = lookupVowelSeq(.u, .or, info.vowels[2])
+            doubleChangeUO = true
+        } else {
+            newVs = info.withRoof
+        }
+
+        guard let newInfo = getVowelSeqInfo(newVs) else {
+            // Undo roof if exists
+            if info.roofPosition == -1 { return processAppend(ev) }
+
+            let curCh = m_buffer[vStart + info.roofPosition].vnSym
+            if target != .nonVnChar && curCh != target { return processAppend(ev) }
+
+            let newCh = (curCh == .ar) ? .a : ((curCh == .er) ? .e : .o)
+            let changePos = vStart + info.roofPosition
+
+            if !ctrl.options.freeMarking && changePos != m_current { return processAppend(ev) }
+
+            markChange(changePos)
+            m_buffer[changePos].vnSym = newCh
+
+            if info.length == 3 {
+                newVs = lookupVowelSeq(m_buffer[vStart].vnSym, m_buffer[vStart+1].vnSym, m_buffer[vStart+2].vnSym)
+            } else if info.length == 2 {
+                newVs = lookupVowelSeq(m_buffer[vStart].vnSym, m_buffer[vStart+1].vnSym)
+            } else {
+                newVs = lookupVowelSeq(m_buffer[vStart].vnSym)
+            }
+
+            if let pInfo = getVowelSeqInfo(newVs) {
+                for i in 0..<pInfo.length {
+                    m_buffer[vStart+i].vseq = pInfo.subsequences[i]
+                }
+            }
+
+            // Tone reposition
+            let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+            if curTonePos != newTonePos && tone != 0 {
+                markChange(newTonePos)
+                m_buffer[newTonePos].tone = tone
+                markChange(curTonePos)
+                m_buffer[curTonePos].tone = 0
+            }
+
+            m_singleMode = false
+            _ = processAppend(ev)
+            m_reverted = true
+            return 1
+        }
+
+        // Add roof
+        if target != .nonVnChar && newInfo.vowels[newInfo.roofPosition] != target {
+            return processAppend(ev)
+        }
+
+        // Validation
+        var c1: ConsonantSequence = .none
+        if m_buffer[m_current].c1Offset != -1 {
+            c1 = m_buffer[m_current - m_buffer[m_current].c1Offset].cseq
+        }
+        var c2: ConsonantSequence = .none
+        if m_buffer[m_current].c2Offset != -1 {
+            c2 = m_buffer[m_current - m_buffer[m_current].c2Offset].cseq
+        }
+
+        if !isValidCVC(c1, newVs, c2) { return processAppend(ev) }
+
+        var changePos = 0
+        if doubleChangeUO {
+            changePos = vStart
+        } else {
+            changePos = vStart + newInfo.roofPosition
+        }
+
+        if !ctrl.options.freeMarking && changePos != m_current { return processAppend(ev) }
+
+        markChange(changePos)
+        if doubleChangeUO {
+            m_buffer[vStart].vnSym = .u
+            m_buffer[vStart+1].vnSym = .or
+        } else {
+            m_buffer[changePos].vnSym = newInfo.vowels[newInfo.roofPosition]
+        }
+
+        for i in 0..<newInfo.length {
+            m_buffer[vStart+i].vseq = newInfo.subsequences[i]
+        }
+
+        let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+        if curTonePos != newTonePos && tone != 0 {
+            markChange(newTonePos)
+            m_buffer[newTonePos].tone = tone
+            markChange(curTonePos)
+            m_buffer[curTonePos].tone = 0
+        }
+
+        return 1
+    }
+
+    private func processHookWithUO(_ ev: UkKeyEvent) -> Int {
+        guard let ctrl = m_pCtrl else { return processAppend(ev) }
+        if !ctrl.options.freeMarking && m_buffer[m_current].vOffset != 0 {
+            return processAppend(ev)
+        }
+
+        let vEnd = m_current - m_buffer[m_current].vOffset
+        let vs = m_buffer[vEnd].vseq
+        guard let info = getVowelSeqInfo(vs) else { return processAppend(ev) }
+        let vStart = vEnd - (info.length - 1)
+        let vowels = info.vowels
+
+        let curTonePos = vStart + getTonePosition(vs, terminated: vEnd == m_current)
+        let tone = m_buffer[curTonePos].tone
+
+        var newVs: VowelSequence = .none
+        var hookRemoved = false
+        var toneRemoved = false
+        var removeWithUndo = true
+
+        switch ev.evType {
+        case UkKeyEvName.hook_u.rawValue:
+            if vowels[0] == .u {
+                newVs = info.withHook
+                markChange(vStart)
+                m_buffer[vStart].vnSym = .uh
+            } else { // uh -> uo
+                newVs = lookupVowelSeq(.u, .o, info.length > 2 ? vowels[2] : .nonVnChar)
+                markChange(vStart)
+                m_buffer[vStart].vnSym = .u
+                m_buffer[vStart+1].vnSym = .o
+                hookRemoved = true
+                toneRemoved = (m_buffer[vStart].tone != 0)
+            }
+
+        case UkKeyEvName.hook_o.rawValue:
+            if vowels[1] == .o || vowels[1] == .or {
+                if vEnd == m_current && info.length == 2 && m_buffer[m_current].form == .cv &&
+                   m_buffer[m_current-2].cseq == .th {
+                    // o|o^ -> o+ (th+uo -> th+uo+)
+                    newVs = info.withHook
+                    markChange(vStart+1)
+                    m_buffer[vStart+1].vnSym = .oh
+                } else {
+                    newVs = lookupVowelSeq(.uh, .oh, info.length > 2 ? vowels[2] : .nonVnChar)
+                    if vowels[0] == .u {
+                        markChange(vStart)
+                        m_buffer[vStart].vnSym = .uh
+                        m_buffer[vStart+1].vnSym = .oh
+                    } else {
+                        markChange(vStart+1)
+                        m_buffer[vStart+1].vnSym = .oh
+                    }
+                }
+            } else { // oh -> uo
+                newVs = lookupVowelSeq(.u, .o, info.length > 2 ? vowels[2] : .nonVnChar)
+                if vowels[0] == .uh {
+                    markChange(vStart)
+                    m_buffer[vStart].vnSym = .u
+                    m_buffer[vStart+1].vnSym = .o
+                } else {
+                    markChange(vStart+1)
+                    m_buffer[vStart+1].vnSym = .o
+                }
+                hookRemoved = true
+                toneRemoved = (m_buffer[vStart+1].tone != 0)
+            }
+
+        default: // hookAll, hookUO
+            if vowels[0] == .u {
+                if vowels[1] == .o || vowels[1] == .or {
+                    // uo -> uo+ if th or h
+                    if (vs == .uo || vs == .uor) && vEnd == m_current && m_buffer[m_current].form == .cv &&
+                       (m_buffer[m_current-2].cseq == .th || m_buffer[m_current-2].cseq == .h) {
+                        newVs = .uoh
+                        markChange(vStart+1)
+                        m_buffer[vStart+1].vnSym = .oh
+                    } else {
+                        // uo -> u+o+
+                        newVs = info.withHook
+                        markChange(vStart)
+                        m_buffer[vStart].vnSym = .uh
+                        if let tempInfo = getVowelSeqInfo(newVs) {
+                            newVs = tempInfo.withHook
+                            m_buffer[vStart+1].vnSym = .oh
+                        }
+                    }
+                } else { // uo+ -> u+o+
+                    newVs = info.withHook
+                    markChange(vStart)
+                    m_buffer[vStart].vnSym = .uh
+                }
+            } else { // v[0] == uh
+                if vowels[1] == .o { // u+o -> u+o+
+                    newVs = info.withHook
+                    markChange(vStart+1)
+                    m_buffer[vStart+1].vnSym = .oh
+                } else { // v[1] == oh, u+o+ -> uo
+                    newVs = lookupVowelSeq(.u, .o, info.length > 2 ? vowels[2] : .nonVnChar)
+                    markChange(vStart)
+                    m_buffer[vStart].vnSym = .u
+                    m_buffer[vStart+1].vnSym = .o
+                    hookRemoved = true
+                    toneRemoved = (m_buffer[vStart].tone != 0 || m_buffer[vStart+1].tone != 0)
+                }
+            }
+        }
+
+        guard let p = getVowelSeqInfo(newVs) else { return 1 } // Should fail gracefully?
+        for i in 0..<p.length {
+            m_buffer[vStart+i].vseq = p.subsequences[i]
+        }
+
+        let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+        if curTonePos != newTonePos && tone != 0 {
+            markChange(newTonePos)
+            m_buffer[newTonePos].tone = tone
+            markChange(curTonePos)
+            m_buffer[curTonePos].tone = 0
+        }
+
+        if hookRemoved && removeWithUndo {
+            m_singleMode = false
+            _ = processAppend(ev)
+            m_reverted = true
+        }
+
+        return 1
+    }
+
+    private func processHook(_ ev: UkKeyEvent) -> Int {
+        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0, m_buffer[m_current].vOffset >= 0 else {
+            return processAppend(ev)
+        }
+
+        let vEnd = m_current - m_buffer[m_current].vOffset
+        let vs = m_buffer[vEnd].vseq
+        guard let info = getVowelSeqInfo(vs) else { return processAppend(ev) }
+        let vStart = vEnd - (info.length - 1)
+        let vowels = info.vowels
+
+        if info.length > 1 && ev.evType != UkKeyEvName.bowl.rawValue &&
+           (vowels[0] == .u || vowels[0] == .uh) &&
+           (vowels[1] == .o || vowels[1] == .oh || vowels[1] == .or) {
+            return processHookWithUO(ev)
+        }
+
+        let curTonePos = vStart + getTonePosition(vs, terminated: vEnd == m_current)
+        let tone = m_buffer[curTonePos].tone
+
+        var newVs = info.withHook
+
+        if newVs == .none {
+            if info.hookPosition == -1 { return processAppend(ev) }
+
+            // Remove hook
+            let curCh = m_buffer[vStart + info.hookPosition].vnSym
+            var newCh: VnLexiName = .nonVnChar
+            if curCh == .ab { newCh = .a }
+            else if curCh == .uh { newCh = .u }
+            else { newCh = .o } // oh -> o
+
+            let changePos = vStart + info.hookPosition
+            if !ctrl.options.freeMarking && changePos != m_current { return processAppend(ev) }
+
+            // Check event type match
+            switch ev.evType {
+            case UkKeyEvName.hook_u.rawValue: if curCh != .uh { return processAppend(ev) }
+            case UkKeyEvName.hook_o.rawValue: if curCh != .oh { return processAppend(ev) }
+            case UkKeyEvName.bowl.rawValue: if curCh != .ab { return processAppend(ev) }
+            default: break
+            }
+
+            markChange(changePos)
+            m_buffer[changePos].vnSym = newCh
+
+            if info.length == 3 {
+                newVs = lookupVowelSeq(m_buffer[vStart].vnSym, m_buffer[vStart+1].vnSym, m_buffer[vStart+2].vnSym)
+            } else if info.length == 2 {
+                newVs = lookupVowelSeq(m_buffer[vStart].vnSym, m_buffer[vStart+1].vnSym)
+            } else {
+                newVs = lookupVowelSeq(m_buffer[vStart].vnSym)
+            }
+
+            if let pInfo = getVowelSeqInfo(newVs) {
+                for i in 0..<pInfo.length {
+                    m_buffer[vStart+i].vseq = pInfo.subsequences[i]
+                }
+            }
+
+            let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+            if curTonePos != newTonePos && tone != 0 {
+                markChange(newTonePos)
+                m_buffer[newTonePos].tone = tone
+                markChange(curTonePos)
+                m_buffer[curTonePos].tone = 0
+            }
+
+            m_singleMode = false
+            _ = processAppend(ev)
+            m_reverted = true
+            return 1
+        } else {
+            guard let newInfo = getVowelSeqInfo(newVs) else { return processAppend(ev) }
+
+            switch ev.evType {
+            case UkKeyEvName.hook_u.rawValue: if newInfo.vowels[newInfo.hookPosition] != .uh { return processAppend(ev) }
+            case UkKeyEvName.hook_o.rawValue: if newInfo.vowels[newInfo.hookPosition] != .oh { return processAppend(ev) }
+            case UkKeyEvName.bowl.rawValue: if newInfo.vowels[newInfo.hookPosition] != .ab { return processAppend(ev) }
+            default: break
+            }
+
+            // Validation (CVC)
+            var c1: ConsonantSequence = .none
+            if m_buffer[m_current].c1Offset != -1 {
+                c1 = m_buffer[m_current - m_buffer[m_current].c1Offset].cseq
+            }
+            var c2: ConsonantSequence = .none
+            if m_buffer[m_current].c2Offset != -1 {
+                c2 = m_buffer[m_current - m_buffer[m_current].c2Offset].cseq
+            }
+
+            if !isValidCVC(c1, newVs, c2) { return processAppend(ev) }
+
+            let changePos = vStart + newInfo.hookPosition
+            if !ctrl.options.freeMarking && changePos != m_current { return processAppend(ev) }
+
+            markChange(changePos)
+            m_buffer[changePos].vnSym = newInfo.vowels[newInfo.hookPosition]
+
+            for i in 0..<newInfo.length {
+                m_buffer[vStart+i].vseq = newInfo.subsequences[i]
+            }
+
+            let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+            if curTonePos != newTonePos && tone != 0 {
+                markChange(newTonePos)
+                m_buffer[newTonePos].tone = tone
+                markChange(curTonePos)
+                m_buffer[curTonePos].tone = 0
+            }
+
+            return 1
+        }
+    }
+
+    private func processDd(_ ev: UkKeyEvent) -> Int {
+        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0 else {
+            return processAppend(ev)
+        }
+
+        // Allow dd in non-vn if preceding is not vowel
+        if m_buffer[m_current].form == .nonVn && m_buffer[m_current].vnSym == .d {
+            let prevSym = (m_current > 0) ? m_buffer[m_current-1].vnSym : .nonVnChar
+            if prevSym == .nonVnChar || !prevSym.isVowel {
+                m_singleMode = true
+                markChange(m_current)
+                m_buffer[m_current].cseq = .dd
+                m_buffer[m_current].vnSym = .dd
+                m_buffer[m_current].form = .c
+                m_buffer[m_current].c1Offset = 0
+                m_buffer[m_current].c2Offset = -1
+                m_buffer[m_current].vOffset = -1
+                return 1
+            }
+        }
+
+        if m_buffer[m_current].c1Offset < 0 {
+            return processAppend(ev)
+        }
+
+        let pos = m_current - m_buffer[m_current].c1Offset
+        if !ctrl.options.freeMarking && pos != m_current {
+            return processAppend(ev)
+        }
+
+        if m_buffer[pos].cseq == .d {
+            markChange(pos)
+            m_buffer[pos].cseq = .dd
+            m_buffer[pos].vnSym = .dd
+            m_singleMode = true
+            return 1
+        }
+
+        if m_buffer[pos].cseq == .dd {
+            markChange(pos)
+            m_buffer[pos].cseq = .d
+            m_buffer[pos].vnSym = .d
+            m_singleMode = false
+            _ = processAppend(ev)
+            m_reverted = true
+            return 1
+        }
+
+        return processAppend(ev)
+    }
+
+    private func processTelexW(_ ev: UkKeyEvent) -> Int {
+        guard let ctrl = m_pCtrl, ctrl.vietKey != 0 else { return processAppend(ev) }
+
+        var newEv = ev
+        newEv.evType = UkKeyEvName.hookAll.rawValue
+        let ret = processHook(newEv)
+
+        if ret == 0 {
+            // Try map char (w -> u/o hook map?)
+            // In C++: uses static flag usedAsMapChar to avoid infinite recursion.
+            // If hook fails, try as mapChar (u+, o+ etc).
+            // W map to Uh/uh?
+            // "ev.evType = vneMapChar; ev.vnSym = isupper? Uh : uh;"
+            // We can try to call processMapChar.
+            if m_current >= 0 {
+                // m_current-- ?
+                // processMapChar usually handles replacement.
+            }
+            newEv.evType = UkKeyEvName.mapChar.rawValue
+            newEv.chType = .vn
+            newEv.vnSym = Charset.isUpper(Character(UnicodeScalar(ev.keyCode) ?? "W")) ? .Uh : .uh
+            return processMapChar(newEv)
+        }
+        return ret
+    }
+
+    private func processMapChar(_ ev: UkKeyEvent) -> Int {
+        return processAppend(ev)
+    }
+
+    private func processEscChar(_ ev: UkKeyEvent) -> Int {
+        return processAppend(ev)
+    }
+
+    private func processAppend(_ ev: UkKeyEvent) -> Int {
+        switch ev.chType {
+        case .reset:
+            reset()
+            return 0
+        case .wordBreak:
+            m_singleMode = false
+            return processWordEnd(ev)
+        case .nonVn:
+             // ...
+             m_current += 1
+             var entry = WordInfo()
+             entry.form = (ev.chType == .wordBreak) ? .empty : .nonVn
+             entry.keyCode = ev.keyCode
+             entry.vnSym = ev.vnSym.toLower
+             entry.caps = (entry.vnSym != ev.vnSym)
+             m_buffer[m_current] = entry
+             markChange(m_current)
+             return 1
+        case .vn:
+             if ev.vnSym.isVowel {
+                 // appendVowel...
+                 var lowerSym = ev.vnSym.toLower
+                 // In C++, StdVnNoTone check.
+                 // We need to normalize to base (remove tone from Input)
+                 // But wait, key input normally doesn't have tone except via mapChar?
+                 // InputMethod returns 'vnSym'.
+
+                 // Logic:
+                 return appendVowel(ev)
+             }
+             return appendConsonnant(ev)
+        }
+    }
+
+    private func appendVowel(_ ev: UkKeyEvent) -> Int {
+        var autoCompleted = false
+        m_current += 1
+        var entry = WordInfo()
+
+        let lowerSym = ev.vnSym.toLower
+        let canSym = lowerSym.baseChar
+
+        entry.vnSym = canSym
+        entry.caps = (lowerSym != ev.vnSym)
+        entry.tone = (lowerSym.rawValue - canSym.rawValue) / 2
+        entry.keyCode = ev.keyCode
+
+        guard let ctrl = m_pCtrl else { return 0 }
+
+        if m_current == 0 || ctrl.vietKey == 0 {
+            entry.form = .v
+            entry.c1Offset = -1
+            entry.c2Offset = -1
+            entry.vOffset = 0
+            entry.vseq = lookupVowelSeq(canSym)
+
+            if ctrl.vietKey == 0 {
+                // If charset check fails... (skipped)
+                // Just return 0? C++ logic
+                return 0
+            }
+            m_buffer[m_current] = entry
+            markChange(m_current)
+            return 1
+        }
+
+        let prev = m_buffer[m_current - 1]
+        var newVs: VowelSequence = .none
+        var tone = 0
+        var newTone = 0
+
+        switch prev.form {
+        case .empty:
+            entry.form = .v
+            entry.c1Offset = -1
+            entry.c2Offset = -1
+            entry.vOffset = 0
+            entry.vseq = lookupVowelSeq(canSym)
+            newVs = entry.vseq
+
+        case .nonVn, .cvc, .vc:
+            entry.form = .nonVn
+            entry.c1Offset = -1
+            entry.c2Offset = -1
+            entry.vOffset = -1
+
+        case .v, .cv:
+            let vs = prev.vseq
+            guard let vsInfo = getVowelSeqInfo(vs) else {
+                entry.form = .nonVn
+                break
+            }
+
+            let prevTonePos = (m_current - 1) - (vsInfo.length - 1) + getTonePosition(vs, terminated: true)
+            tone = m_buffer[prevTonePos].tone
+
+            if lowerSym != canSym && tone != 0 {
+                newVs = .none
+            } else {
+                if vsInfo.length == 3 {
+                    newVs = .none
+                } else if vsInfo.length == 2 {
+                    newVs = lookupVowelSeq(vsInfo.vowels[0], vsInfo.vowels[1], canSym)
+                } else {
+                    newVs = lookupVowelSeq(vsInfo.vowels[0], canSym)
+                }
+            }
+
+            if newVs != .none && prev.form == .cv {
+                if prev.c1Offset >= 0 {
+                    let cs = m_buffer[m_current - 1 - prev.c1Offset].cseq
+                    if !isValidCV(cs, newVs) {
+                        newVs = .none
+                    }
+                }
+            }
+
+            if newVs == .none {
+                entry.form = .nonVn
+                entry.c1Offset = -1
+                entry.c2Offset = -1
+                entry.vOffset = -1
+                break
+            }
+
+            entry.form = prev.form
+            entry.c1Offset = (prev.form == .cv) ? prev.c1Offset + 1 : -1
+            entry.c2Offset = -1
+            entry.vOffset = 0
+            entry.vseq = newVs
+            entry.tone = 0
+
+            newTone = (lowerSym.rawValue - canSym.rawValue) / 2
+
+            if tone == 0 {
+                if newTone != 0 {
+                    tone = newTone
+                    let tonePos = getTonePosition(newVs, terminated: true) + ((m_current - 1) - vsInfo.length + 1)
+                    // Wait, logic in C++: tonePos = getTonePosition(...) + ...
+                    // Correct.
+                    // But we need buffer index.
+                    // C++: tonePos is absolute index?
+                    // "tonePos = getTonePosition(newVs, true) + ((m_current - 1) - VSeqList[vs].len + 1);"
+                    // (m_current - 1) is index of previous char.
+                    // VSeqList[vs].len is length of PREVIOUS sequence.
+                    // So ((m_current - 1) - len + 1) is START of sequence.
+                    // Correct.
+
+                    // We need newVs info for getTonePosition? Yes.
+                    // But C++ uses getTonePosition(newVs, true).
+                    // Wait, tonePos depends on newVs structure.
+                    // If newVs is length 2 (extended), and previous was length 1.
+                    // The start index is the same.
+
+                    markChange(tonePos)
+                    m_buffer[m_current] = entry // Save entry before accessing buffer potentially?
+                    // No, tonePos is previous char usually.
+                    // But wait, tonePos is calculated based on start.
+                    // We must ensure buffer at tonePos is valid.
+                    // If tonePos == m_current, we are setting tone on current.
+                    // Yes.
+
+                    m_buffer[m_current] = entry // Commit current
+                    m_buffer[tonePos].tone = tone
+                    return 1
+                }
+            } else {
+                let newTonePos = getTonePosition(newVs, terminated: true) + ((m_current - 1) - vsInfo.length + 1)
+                if newTonePos != prevTonePos {
+                    markChange(prevTonePos)
+                    m_buffer[prevTonePos].tone = 0
+                    markChange(newTonePos)
+                    if newTone != 0 { tone = newTone }
+                    m_buffer[m_current] = entry
+                    m_buffer[newTonePos].tone = tone
+                    return 1
+                }
+                if newTone != 0 && newTone != tone {
+                    tone = newTone
+                    markChange(prevTonePos)
+                    m_buffer[m_current] = entry
+                    m_buffer[prevTonePos].tone = tone
+                    return 1
+                }
+            }
+
+        case .c:
+            newVs = lookupVowelSeq(canSym)
+            let cs = prev.cseq
+            if !isValidCV(cs, newVs) {
+                entry.form = .nonVn
+                entry.c1Offset = -1
+                entry.c2Offset = -1
+                entry.vOffset = -1
+                break
+            }
+
+            entry.form = .cv
+            entry.c1Offset = 1
+            entry.c2Offset = -1
+            entry.vOffset = 0
+            entry.vseq = newVs
+
+            if cs == .gi && prev.tone != 0 {
+                if entry.tone == 0 { entry.tone = prev.tone }
+                markChange(m_current - 1)
+                m_buffer[m_current - 1].tone = 0
+                m_buffer[m_current] = entry
+                return 1
+            }
+        }
+
+        m_buffer[m_current] = entry
+        markChange(m_current)
+        return 1
+    }
+
+    private func appendConsonnant(_ ev: UkKeyEvent) -> Int {
+        var complexEvent = false
+        m_current += 1
+        var entry = WordInfo()
+
+        let lowerSym = ev.vnSym.toLower
+        entry.vnSym = lowerSym
+        entry.caps = (lowerSym != ev.vnSym)
+        entry.keyCode = ev.keyCode
+        entry.tone = 0
+
+        guard let ctrl = m_pCtrl else { return 0 }
+
+        if m_current == 0 || ctrl.vietKey == 0 {
+            entry.form = .c
+            entry.c1Offset = 0
+            entry.c2Offset = -1
+            entry.vOffset = -1
+            entry.cseq = lookupConsonantSeq(lowerSym)
+
+            if ctrl.vietKey == 0 { return 0 }
+            m_buffer[m_current] = entry
+            markChange(m_current)
+            return 1
+        }
+
+        var prev = m_buffer[m_current - 1]
+        var cs: ConsonantSequence = .none
+        var newCs: ConsonantSequence = .none
+
+        switch prev.form {
+        case .nonVn:
+            entry.form = .nonVn
+            entry.c1Offset = -1
+            entry.c2Offset = -1
+            entry.vOffset = -1
+            m_buffer[m_current] = entry
+            markChange(m_current)
+            return 1
+
+        case .empty:
+            entry.form = .c
+            entry.c1Offset = 0
+            entry.c2Offset = -1
+            entry.vOffset = -1
+            entry.cseq = lookupConsonantSeq(lowerSym)
+            m_buffer[m_current] = entry
+            markChange(m_current)
+            return 1
+
+        case .v, .cv:
+            var vs = prev.vseq
+            var newVs = vs
+            if vs == .uoh || vs == .uho {
+                newVs = .uhoh
+            }
+
+            var c1: ConsonantSequence = .none
+            if prev.c1Offset != -1 {
+                c1 = m_buffer[m_current - 1 - prev.c1Offset].cseq
+            }
+
+            newCs = lookupConsonantSeq(lowerSym)
+            let isValid = isValidCVC(c1, newVs, newCs)
+
+            if isValid {
+                if vs == .uho {
+                    markChange(m_current - 1)
+                    m_buffer[m_current - 1].vnSym = .oh
+                    m_buffer[m_current - 1].vseq = .uhoh
+                    prev.vseq = .uhoh // Update local copy if needed? No, reference `prev` is value copy in Swift struct?
+                    // Swift structs are value types. `prev` is a copy.
+                    // We must update m_buffer directly.
+                    complexEvent = true
+                } else if vs == .uoh {
+                    markChange(m_current - 2)
+                    m_buffer[m_current - 2].vnSym = .uh
+                    m_buffer[m_current - 2].vseq = .uh
+                    m_buffer[m_current - 1].vseq = .uhoh
+                    complexEvent = true
+                }
+
+                if prev.form == .v {
+                    entry.form = .vc
+                    entry.c1Offset = -1
+                    entry.c2Offset = 0
+                    entry.vOffset = 1
+                } else {
+                    entry.form = .cvc
+                    entry.c1Offset = prev.c1Offset + 1
+                    entry.c2Offset = 0
+                    entry.vOffset = 1
+                }
+                entry.cseq = newCs
+
+                // Reposition tone
+                guard let vsInfo = getVowelSeqInfo(vs), let newVsInfo = getVowelSeqInfo(newVs) else { break }
+
+                let oldIdx = (m_current - 1) - (vsInfo.length - 1) + getTonePosition(vs, terminated: true)
+                if m_buffer[oldIdx].tone != 0 {
+                    let newIdx = (m_current - 1) - (newVsInfo.length - 1) + getTonePosition(newVs, terminated: false)
+                    if newIdx != oldIdx {
+                        markChange(newIdx)
+                        m_buffer[newIdx].tone = m_buffer[oldIdx].tone
+                        markChange(oldIdx)
+                        m_buffer[oldIdx].tone = 0
+                        m_buffer[m_current] = entry
+                        return 1
+                    }
+                }
+            } else {
+                entry.form = .nonVn
+                entry.c1Offset = -1
+                entry.c2Offset = -1
+                entry.vOffset = -1
+            }
+
+            if complexEvent {
+                m_buffer[m_current] = entry
+                return 1
+            }
+            m_buffer[m_current] = entry
+            markChange(m_current)
+            return 1
+
+        case .c, .vc, .cvc:
+            cs = prev.cseq
+            guard let csInfo = getConsonantSeqInfo(cs) else {
+                entry.form = .nonVn
+                break
+            }
+
+            if csInfo.length == 3 {
+                newCs = .none
+            } else if csInfo.length == 2 {
+                newCs = lookupConsonantSeq(csInfo.consonants[0], csInfo.consonants[1], lowerSym)
+            } else {
+                newCs = lookupConsonantSeq(csInfo.consonants[0], lowerSym)
+            }
+
+            if newCs != .none && (prev.form == .vc || prev.form == .cvc) {
+                var c1: ConsonantSequence = .none
+                if prev.c1Offset != -1 {
+                    c1 = m_buffer[m_current - 1 - prev.c1Offset].cseq
+                }
+                let vIdx = (m_current - 1) - prev.vOffset
+                let vs = m_buffer[vIdx].vseq
+                if !isValidCVC(c1, vs, newCs) {
+                    newCs = .none
+                }
+            }
+
+            if newCs == .none {
+                entry.form = .nonVn
+                entry.c1Offset = -1
+                entry.c2Offset = -1
+                entry.vOffset = -1
+            } else {
+                if prev.form == .c {
+                    entry.form = .c
+                    entry.c1Offset = 0
+                    entry.c2Offset = -1
+                    entry.vOffset = -1
+                } else if prev.form == .vc {
+                    entry.form = .vc
+                    entry.c1Offset = -1
+                    entry.c2Offset = 0
+                    entry.vOffset = prev.vOffset + 1
+                } else {
+                    entry.form = .cvc
+                    entry.c1Offset = prev.c1Offset + 1
+                    entry.c2Offset = 0
+                    entry.vOffset = prev.vOffset + 1
+                }
+                entry.cseq = newCs
+            }
+            m_buffer[m_current] = entry
+            markChange(m_current)
+            return 1
+        }
+
+        m_buffer[m_current] = entry
+        markChange(m_current)
+        return 1
+    }
+
+    private func processNoSpellCheck(_ ev: UkKeyEvent) -> Int {
+        var entry = m_buffer[m_current]
+        if entry.vnSym.isVowel {
+             entry.form = .v
+             entry.vOffset = 0
+             entry.vseq = lookupVowelSeq(entry.vnSym)
+             entry.c1Offset = -1
+             entry.c2Offset = -1
+        } else {
+             entry.form = .c
+             entry.c1Offset = 0
+             entry.c2Offset = -1
+             entry.vOffset = -1
+             entry.cseq = lookupConsonantSeq(entry.vnSym)
+        }
+        m_buffer[m_current] = entry
+
+        if ev.evType == UkKeyEvName.normal.rawValue &&
+           ((entry.keyCode >= 65 && entry.keyCode <= 90) || (entry.keyCode >= 97 && entry.keyCode <= 122)) {
+            return 0
+        }
+
+        markChange(m_current)
+        return 1
+    }
+
+    private func prepareBuffer() {
+        if m_current >= m_bufSize - 10 {
+            // Get rid of at least half of the current entries
+            // don't get rid from the middle of a word.
+            var rid = m_current / 2
+            while rid < m_current && m_buffer[rid].form != .empty {
+                rid += 1
+            }
+
+            if rid == m_current {
+                m_current = -1
+            } else {
+                rid += 1
+                if rid <= m_current {
+                    for i in 0...(m_current - rid) {
+                        m_buffer[i] = m_buffer[rid + i]
+                    }
+                    m_current -= rid
+                } else {
+                    // rid > m_current means we cleared everything
+                    m_current = -1
+                }
+            }
+        }
+
+        if m_keyCurrent > 0 && m_keyCurrent + 1 >= m_keyBufSize {
+            let rid = m_keyCurrent / 2
+            if rid <= m_keyCurrent {
+                for i in 0...(m_keyCurrent - rid) {
+                    m_keyStrokes[i] = m_keyStrokes[rid + i]
+                }
+                m_keyCurrent -= rid
+            }
+        }
+    }
+
+    private func writeOutput() {
+        // Convert to Unicode
+        m_outBuf = []
+        for i in m_changePos...m_current {
+            if i < 0 { continue }
+            let info = m_buffer[i]
+            var sym = info.vnSym
+
+            if sym != .nonVnChar {
+                 if info.tone > 0 && sym.isVowel {
+                     sym = sym.withTone(info.tone)
+                 }
+                 if info.caps {
+                     sym = sym.toUpper
+                 }
+
+                 // To Unicode
+                 if let u = vnLexiToUnicode[sym] {
+                     m_outBuf.append(contentsOf: u.utf16)
+                 } else {
+                     m_outBuf.append(UInt16(info.keyCode)) // Fallback
+                 }
+            } else {
+                m_outBuf.append(UInt16(info.keyCode))
+            }
+        }
+        m_outputWritten = true
+    }
+
+    private func getSeqSteps(_ first: Int, _ last: Int) -> Int {
+        if last < first { return 0 }
+        // Calculate length of output between first and last
+        var len = 0
+        for i in first...last {
+             let info = m_buffer[i]
+             if info.vnSym != .nonVnChar {
+                 var sym = info.vnSym
+                 if info.tone > 0 && sym.isVowel { sym = sym.withTone(info.tone) }
+                 if let u = vnLexiToUnicode[sym] {
+                     len += u.utf16.count
+                 } else {
+                     len += 1
+                 }
+             } else {
+                 len += 1
+             }
+        }
+        return len
+    }
+
+    private func markChange(_ pos: Int) {
+        if pos < m_changePos {
+            m_backs += getSeqSteps(pos, m_changePos - 1)
+            m_changePos = pos
+        }
+    }
+
+    private func getTonePosition(_ vs: VowelSequence, terminated: Bool) -> Int {
+        guard let info = getVowelSeqInfo(vs) else { return 0 }
+
+        if info.length == 1 { return 0 }
+        if info.roofPosition != -1 { return info.roofPosition }
+        if info.hookPosition != -1 {
+            if vs == .uhoh || vs == .uhohi || vs == .uhohu { return 1 }
+            return info.hookPosition
+        }
+
+        if info.length == 3 { return 1 }
+
+        if (m_pCtrl?.options.modernStyle ?? true) {
+            if vs == .oa || vs == .oe || vs == .uy { return 1 }
+        }
+
+        return terminated ? 0 : 1
+    }
+
+    private func synchKeyStrokeBuffer() {
+        if m_keyCurrent >= 0 {
+            m_keyCurrent -= 1
+        }
+        if m_current >= 0 && m_buffer[m_current].form == .empty {
+            while m_keyCurrent >= 0 && m_keyStrokes[m_keyCurrent].ev.chType != .wordBreak {
+                m_keyCurrent -= 1
+            }
+        }
+    }
+
+    private func isValidCV(_ c: ConsonantSequence, _ v: VowelSequence) -> Bool {
+        if c == .none || v == .none { return true }
+        guard let vInfo = getVowelSeqInfo(v) else { return true }
+
+        if (c == .gi && vInfo.vowels[0] == .i) || (c == .qu && vInfo.vowels[0] == .u) {
+            return false
+        }
+
+        if c == .k {
+            let kVseq: [VowelSequence] = [.e, .i, .y, .er, .eo, .eu, .eru, .ia, .ie, .ier, .ieu, .ieru]
+            return kVseq.contains(v)
+        }
+        return true
+    }
+
+    private func isValidVC(_ v: VowelSequence, _ c: ConsonantSequence) -> Bool {
+        if v == .none || c == .none { return true }
+
+        guard let vInfo = getVowelSeqInfo(v) else { return true }
+        if !vInfo.conSuffix { return false }
+
+        guard let cInfo = getConsonantSeqInfo(c) else { return true }
+        if !cInfo.suffix { return false }
+
+        return validVCPairs.contains(VCPair(v: v, c: c))
+    }
+
+    private func isValidCVC(_ c1: ConsonantSequence, _ v: VowelSequence, _ c2: ConsonantSequence) -> Bool {
+        if v == .none {
+            return (c1 == .none || c2 != .none)
+        }
+
+        if c1 == .none {
+            return isValidVC(v, c2)
+        }
+
+        if c2 == .none {
+            return isValidCV(c1, v)
+        }
+
+        let okCV = isValidCV(c1, v)
+        let okVC = isValidVC(v, c2)
+
+        if okCV && okVC {
+            return true
+        }
+
+        if !okVC {
+            // Exceptions
+            // quyn, quynh
+            if c1 == .qu && v == .y && (c2 == .n || c2 == .nh) {
+                return true
+            }
+
+            // gieng, gie^ng
+            if c1 == .gi && (v == .e || v == .er) && (c2 == .n || c2 == .ng) {
+                return true
+            }
+        }
+
+        return false
+    }
+
 }
+
+// Unicode Table
+private let vnLexiToUnicode: [VnLexiName: String] = [
+    .A: "A", .a: "a", .A1: "\u{00C1}", .a1: "\u{00E1}", .A2: "\u{00C0}", .a2: "\u{00E0}", .A3: "\u{1EA2}", .a3: "\u{1EA3}", .A4: "\u{00C3}", .a4: "\u{00E3}", .A5: "\u{1EA0}", .a5: "\u{1EA1}",
+    .Ar: "\u{00C2}", .ar: "\u{00E2}", .Ar1: "\u{1EA4}", .ar1: "\u{1EA5}", .Ar2: "\u{1EA6}", .ar2: "\u{1EA7}", .Ar3: "\u{1EA8}", .ar3: "\u{1EA9}", .Ar4: "\u{1EAA}", .ar4: "\u{1EAB}", .Ar5: "\u{1EAC}", .ar5: "\u{1EAD}",
+    .Ab: "\u{0102}", .ab: "\u{0103}", .Ab1: "\u{1EAE}", .ab1: "\u{1EAF}", .Ab2: "\u{1EB0}", .ab2: "\u{1EB1}", .Ab3: "\u{1EB2}", .ab3: "\u{1EB3}", .Ab4: "\u{1EB4}", .ab4: "\u{1EB5}", .Ab5: "\u{1EB6}", .ab5: "\u{1EB7}",
+    .E: "E", .e: "e", .E1: "\u{00C9}", .e1: "\u{00E9}", .E2: "\u{00C8}", .e2: "\u{00E8}", .E3: "\u{1EBA}", .e3: "\u{1EBB}", .E4: "\u{1EBC}", .e4: "\u{1EBD}", .E5: "\u{1EB8}", .e5: "\u{1EB9}",
+    .Er: "\u{00CA}", .er: "\u{00EA}", .Er1: "\u{1EBE}", .er1: "\u{1EBF}", .Er2: "\u{1EC0}", .er2: "\u{1EC1}", .Er3: "\u{1EC2}", .er3: "\u{1EC3}", .Er4: "\u{1EC4}", .er4: "\u{1EC5}", .Er5: "\u{1EC6}", .er5: "\u{1EC7}",
+    .I: "I", .i: "i", .I1: "\u{00CD}", .i1: "\u{00ED}", .I2: "\u{00CC}", .i2: "\u{00EC}", .I3: "\u{1EC8}", .i3: "\u{1EC9}", .I4: "\u{0128}", .i4: "\u{0129}", .I5: "\u{1ECA}", .i5: "\u{1ECB}",
+    .O: "O", .o: "o", .O1: "\u{00D3}", .o1: "\u{00F3}", .O2: "\u{00D2}", .o2: "\u{00F2}", .O3: "\u{1ECE}", .o3: "\u{1ECF}", .O4: "\u{00D5}", .o4: "\u{00F5}", .O5: "\u{1ECC}", .o5: "\u{1ECD}",
+    .Or: "\u{00D4}", .or: "\u{00F4}", .Or1: "\u{1ED0}", .or1: "\u{1ED1}", .Or2: "\u{1ED2}", .or2: "\u{1ED3}", .Or3: "\u{1ED4}", .or3: "\u{1ED5}", .Or4: "\u{1ED6}", .or4: "\u{1ED7}", .Or5: "\u{1ED8}", .or5: "\u{1ED9}",
+    .Oh: "\u{01A0}", .oh: "\u{01A1}", .Oh1: "\u{1EDA}", .oh1: "\u{1EDB}", .Oh2: "\u{1EDC}", .oh2: "\u{1EDD}", .Oh3: "\u{1EDE}", .oh3: "\u{1EDF}", .Oh4: "\u{1EE0}", .oh4: "\u{1EE1}", .Oh5: "\u{1EE2}", .oh5: "\u{1EE3}",
+    .U: "U", .u: "u", .U1: "\u{00DA}", .u1: "\u{00FA}", .U2: "\u{00D9}", .u2: "\u{00F9}", .U3: "\u{1EE6}", .u3: "\u{1EE7}", .U4: "\u{0168}", .u4: "\u{0169}", .U5: "\u{1EE4}", .u5: "\u{1EE5}",
+    .Uh: "\u{01AF}", .uh: "\u{01B0}", .Uh1: "\u{1EE8}", .uh1: "\u{1EE9}", .Uh2: "\u{1EEA}", .uh2: "\u{1EEB}", .Uh3: "\u{1EEC}", .uh3: "\u{1EED}", .Uh4: "\u{1EEE}", .uh4: "\u{1EEF}", .Uh5: "\u{1EF0}", .uh5: "\u{1EF1}",
+    .Y: "Y", .y: "y", .Y1: "\u{00DD}", .y1: "\u{00FD}", .Y2: "\u{1EF2}", .y2: "\u{1EF3}", .Y3: "\u{1EF6}", .y3: "\u{1EF7}", .Y4: "\u{1EF8}", .y4: "\u{1EF9}", .Y5: "\u{1EF4}", .y5: "\u{1EF5}",
+    .dd: "\u{0111}", .DD: "\u{0110}",
+    .B: "B", .b: "b", .C: "C", .c: "c", .D: "D", .d: "d",
+    .F: "F", .f: "f", .G: "G", .g: "g", .H: "H", .h: "h",
+    .J: "J", .j: "j", .K: "K", .k: "k", .L: "L", .l: "l", .M: "M", .m: "m", .N: "N", .n: "n",
+    .P: "P", .p: "p", .Q: "Q", .q: "q", .R: "R", .r: "r", .S: "S", .s: "s", .T: "T", .t: "t",
+    .V: "V", .v: "v", .W: "W", .w: "w", .X: "X", .x: "x", .Z: "Z", .z: "z"
+]
