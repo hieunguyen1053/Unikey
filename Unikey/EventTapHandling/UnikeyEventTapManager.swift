@@ -199,7 +199,7 @@ public class UnikeyEventTapManager {
 
     // Get event info
     let flags = event.flags
-    let keyCode = getKeyCode(from: event)
+    let keyCode = event.keyCode
 
     // Skip if Command or Control pressed (modifiers)
     // xim.c checks for ControlMask | Mod1Mask in char processing
@@ -224,7 +224,7 @@ public class UnikeyEventTapManager {
     }
 
     // Get character
-    guard let chars = getCharacters(from: event), let char = chars.first else {
+    guard let chars = event.characters, let char = chars.first else {
       return Unmanaged.passUnretained(event)
     }
 
@@ -251,19 +251,6 @@ public class UnikeyEventTapManager {
     return Unmanaged.passUnretained(event)
   }
 
-  // MARK: - CGEvent Helpers
-
-  /// Get key code from CGEvent
-  private func getKeyCode(from event: CGEvent) -> UInt16 {
-    return UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-  }
-
-  /// Get characters from CGEvent
-  private func getCharacters(from event: CGEvent) -> String? {
-    guard let nsEvent = NSEvent(cgEvent: event) else { return nil }
-    return nsEvent.characters
-  }
-
   // MARK: - Permission Check
 
   /// Check if accessibility permission is granted
@@ -276,5 +263,18 @@ public class UnikeyEventTapManager {
   public func requestAccessibilityPermission() {
     let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
     _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+  }
+}
+
+// MARK: - CGEvent Extension
+
+extension CGEvent {
+  var characters: String? {
+    guard let nsEvent = NSEvent(cgEvent: self) else { return nil }
+    return nsEvent.characters
+  }
+
+  var keyCode: UInt16 {
+    return UInt16(getIntegerValueField(.keyboardEventKeycode))
   }
 }

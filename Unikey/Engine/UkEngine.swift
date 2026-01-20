@@ -544,7 +544,7 @@ public class UkEngine {
             default: break
             }
         } else if entry.form == .nonVn {
-            let ch = Charset.toUpper(
+            _ = Charset.toUpper(
                 Character(UnicodeScalar(entry.keyCode) ?? " ")
             )
             // Check...
@@ -674,9 +674,10 @@ public class UkEngine {
     }
 
     private func processRoof(_ ev: UkKeyEvent) -> Int {
-        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0,
-            m_buffer[m_current].vOffset >= 0
-        else {
+        guard let ctrl = m_pCtrl else { return processAppend(ev) }
+
+        if ctrl.vietKey == 0 || m_current < 0 || m_buffer[m_current].vOffset < 0
+        {
             return processAppend(ev)
         }
 
@@ -685,7 +686,7 @@ public class UkEngine {
         case UkKeyEvName.roof_a.rawValue: target = .ar
         case UkKeyEvName.roof_e.rawValue: target = .er
         case UkKeyEvName.roof_o.rawValue: target = .or
-        default: break
+        default: target = .nonVnChar
         }
 
         let vEnd = m_current - m_buffer[m_current].vOffset
@@ -701,24 +702,31 @@ public class UkEngine {
         var doubleChangeUO = false
 
         if vs == .uho || vs == .uhoh || vs == .uhoi || vs == .uhohi {
+            // special cases: u+o+ -> uo^, u+o -> uo^, u+o+i -> uo^i, u+oi -> uo^i
             newVs = lookupVowelSeq(.u, .or, info.vowels[2])
             doubleChangeUO = true
         } else {
             newVs = info.withRoof
         }
 
-        guard let newInfo = getVowelSeqInfo(newVs) else {
-            // Undo roof if exists
-            if info.roofPosition == -1 { return processAppend(ev) }
+        var roofRemoved = false
+        var pInfo: VowelSeqInfo? = nil
+        var changePos = 0
 
+        if newVs == .none {
+            if info.roofPosition == -1 {
+                return processAppend(ev)  // roof is not applicable
+            }
+
+            // a roof already exists -> undo roof
             let curCh = m_buffer[vStart + info.roofPosition].vnSym
             if target != .nonVnChar && curCh != target {
-                return processAppend(ev)
+                return processAppend(ev)  // specific roof and the roof character don't match
             }
 
             let newCh: VnLexiName =
                 (curCh == .ar) ? .a : ((curCh == .er) ? .e : .o)
-            let changePos = vStart + info.roofPosition
+            changePos = vStart + info.roofPosition
 
             if !ctrl.options.freeMarking && changePos != m_current {
                 return processAppend(ev)
@@ -742,77 +750,86 @@ public class UkEngine {
                 newVs = lookupVowelSeq(m_buffer[vStart].vnSym)
             }
 
-            if let pInfo = getVowelSeqInfo(newVs) {
-                for i in 0..<pInfo.length {
-                    m_buffer[vStart + i].vseq = pInfo.subsequences[i]
-                }
+            pInfo = getVowelSeqInfo(newVs)
+            roofRemoved = true
+        } else {
+            pInfo = getVowelSeqInfo(newVs)
+            guard let validPInfo = pInfo else { return processAppend(ev) }  // Safety check
+
+            if target != .nonVnChar
+                && validPInfo.vowels[validPInfo.roofPosition] != target
+            {
+                return processAppend(ev)
             }
 
-            // Tone reposition
-            let newTonePos =
-                vStart + getTonePosition(newVs, terminated: vEnd == m_current)
-            if curTonePos != newTonePos && tone != 0 {
-                markChange(newTonePos)
-                m_buffer[newTonePos].tone = tone
-                markChange(curTonePos)
-                m_buffer[curTonePos].tone = 0
+            // check validity of new VC and CV
+            var valid = true
+            var c1: ConsonantSequence = .none
+            var c2: ConsonantSequence = .none
+
+            if m_buffer[m_current].c1Offset != -1 {
+                c1 = m_buffer[m_current - m_buffer[m_current].c1Offset].cseq
+            }
+            if m_buffer[m_current].c2Offset != -1 {
+                c2 = m_buffer[m_current - m_buffer[m_current].c2Offset].cseq
             }
 
-            m_singleMode = false
-            _ = processAppend(ev)
-            m_reverted = true
-            return 1
+            valid = isValidCVC(c1, newVs, c2)
+            if !valid {
+                return processAppend(ev)
+            }
+
+            if doubleChangeUO {
+                changePos = vStart
+            } else {
+                changePos = vStart + validPInfo.roofPosition
+            }
+
+            if !ctrl.options.freeMarking && changePos != m_current {
+                return processAppend(ev)
+            }
+
+            markChange(changePos)
+            if doubleChangeUO {
+                m_buffer[vStart].vnSym = .u
+                m_buffer[vStart + 1].vnSym = .or
+            } else {
+                m_buffer[changePos].vnSym =
+                    validPInfo.vowels[validPInfo.roofPosition]
+            }
         }
 
-        // Add roof
-        if target != .nonVnChar
-            && newInfo.vowels[newInfo.roofPosition] != target
-        {
-            return processAppend(ev)
+        if let validPInfo = pInfo {
+            for i in 0..<validPInfo.length {
+                m_buffer[vStart + i].vseq = validPInfo.subsequences[i]
+            }
         }
 
-        // Validation
-        var c1: ConsonantSequence = .none
-        if m_buffer[m_current].c1Offset != -1 {
-            c1 = m_buffer[m_current - m_buffer[m_current].c1Offset].cseq
-        }
-        var c2: ConsonantSequence = .none
-        if m_buffer[m_current].c2Offset != -1 {
-            c2 = m_buffer[m_current - m_buffer[m_current].c2Offset].cseq
-        }
-
-        if !isValidCVC(c1, newVs, c2) { return processAppend(ev) }
-
-        var changePos = 0
-        if doubleChangeUO {
-            changePos = vStart
-        } else {
-            changePos = vStart + newInfo.roofPosition
-        }
-
-        if !ctrl.options.freeMarking && changePos != m_current {
-            return processAppend(ev)
-        }
-
-        markChange(changePos)
-        if doubleChangeUO {
-            m_buffer[vStart].vnSym = .u
-            m_buffer[vStart + 1].vnSym = .or
-        } else {
-            m_buffer[changePos].vnSym = newInfo.vowels[newInfo.roofPosition]
-        }
-
-        for i in 0..<newInfo.length {
-            m_buffer[vStart + i].vseq = newInfo.subsequences[i]
-        }
-
+        // check if tone re-position is needed
         let newTonePos =
             vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+
+        /* //For now, users don't seem to like the following processing, thus commented out
+        if (roofRemoved && tone != 0 &&
+            (!pInfo->complete || changePos == curTonePos)) {
+            //remove tone if the vowel sequence becomes incomplete as a result of roof removal OR
+            //if removed roof is at the same position as the current tone
+            markChange(curTonePos);
+            m_buffer[curTonePos].tone = 0;
+        } else
+        */
+
         if curTonePos != newTonePos && tone != 0 {
             markChange(newTonePos)
             m_buffer[newTonePos].tone = tone
             markChange(curTonePos)
             m_buffer[curTonePos].tone = 0
+        }
+
+        if roofRemoved {
+            m_singleMode = false
+            _ = processAppend(ev)
+            m_reverted = true
         }
 
         return 1
@@ -837,7 +854,7 @@ public class UkEngine {
         var newVs: VowelSequence = .none
         var hookRemoved = false
         var toneRemoved = false
-        var removeWithUndo = true
+        let removeWithUndo = true
 
         switch ev.evType {
         case UkKeyEvName.hook_u.rawValue:
@@ -957,7 +974,12 @@ public class UkEngine {
 
         let newTonePos =
             vStart + getTonePosition(newVs, terminated: vEnd == m_current)
-        if curTonePos != newTonePos && tone != 0 {
+
+        // Logic for toneRemoved requested by user
+        if hookRemoved && tone != 0 && (!p.complete || toneRemoved) {
+            markChange(curTonePos)
+            m_buffer[curTonePos].tone = 0
+        } else if curTonePos != newTonePos && tone != 0 {
             markChange(newTonePos)
             m_buffer[newTonePos].tone = tone
             markChange(curTonePos)
@@ -1224,26 +1246,43 @@ public class UkEngine {
             m_singleMode = false
             return processWordEnd(ev)
         case .nonVn:
-            // ...
+            if let ctrl = m_pCtrl,
+                ctrl.vietKey != 0 && ctrl.charsetId == 10
+                    && checkEscapeVIQR(ev) != 0
+            {
+                return 1
+            }
+
             m_current += 1
             var entry = WordInfo()
             entry.form = (ev.chType == .wordBreak) ? .empty : .nonVn
+            entry.c1Offset = -1
+            entry.c2Offset = -1
+            entry.vOffset = -1
             entry.keyCode = ev.keyCode
             entry.vnSym = ev.vnSym.toLower
+            entry.tone = 0
             entry.caps = (entry.vnSym != ev.vnSym)
+
+            if let ctrl = m_pCtrl {
+                if ctrl.vietKey == 0 || ctrl.charsetId != 6 {
+                    return 0
+                }
+            }
+
             m_buffer[m_current] = entry
             markChange(m_current)
             return 1
         case .vn:
             if ev.vnSym.isVowel {
-                // appendVowel...
-                var lowerSym = ev.vnSym.toLower
-                // In C++, StdVnNoTone check.
-                // We need to normalize to base (remove tone from Input)
-                // But wait, key input normally doesn't have tone except via mapChar?
-                // InputMethod returns 'vnSym'.
+                let v = ev.vnSym.toLower.baseChar
 
-                // Logic:
+                if m_current >= 0 && m_buffer[m_current].form == .c {
+                    let cseq = m_buffer[m_current].cseq
+                    if (cseq == .q && v == .u) || (cseq == .g && v == .i) {
+                        return appendConsonnant(ev)
+                    }
+                }
                 return appendVowel(ev)
             }
             return appendConsonnant(ev)
@@ -1251,7 +1290,7 @@ public class UkEngine {
     }
 
     private func appendVowel(_ ev: UkKeyEvent) -> Int {
-        var autoCompleted = false
+        let autoCompleted = false
         m_current += 1
         var entry = WordInfo()
 
@@ -1263,7 +1302,10 @@ public class UkEngine {
         entry.tone = (lowerSym.rawValue - canSym.rawValue) / 2
         entry.keyCode = ev.keyCode
 
-        guard let ctrl = m_pCtrl else { return 0 }
+        guard let ctrl = m_pCtrl else {
+            m_current -= 1
+            return 0
+        }
 
         if m_current == 0 || ctrl.vietKey == 0 {
             entry.form = .v
@@ -1273,9 +1315,14 @@ public class UkEngine {
             entry.vseq = lookupVowelSeq(canSym)
 
             if ctrl.vietKey == 0 {
-                // If charset check fails... (skipped)
-                // Just return 0? C++ logic
-                return 0
+                // Charset check simplification: if not VietKey, allow if alpha?
+                // Replicating logic consistent with C++
+                let isAlpha =
+                    (entry.keyCode >= 65 && entry.keyCode <= 90)
+                    || (entry.keyCode >= 97 && entry.keyCode <= 122)
+                if isAlpha {
+                    return 0
+                }
             }
             m_buffer[m_current] = entry
             markChange(m_current)
@@ -1284,8 +1331,12 @@ public class UkEngine {
 
         let prev = m_buffer[m_current - 1]
         var newVs: VowelSequence = .none
+        var cs: ConsonantSequence = .none
+        var prevTonePos = 0
         var tone = 0
         var newTone = 0
+        var tonePos = 0
+        var newTonePos = 0
 
         switch prev.form {
         case .empty:
@@ -1305,11 +1356,12 @@ public class UkEngine {
         case .v, .cv:
             let vs = prev.vseq
             guard let vsInfo = getVowelSeqInfo(vs) else {
-                entry.form = .nonVn
-                break
+                newVs = .none
+                break  // switch
             }
 
-            let prevTonePos =
+            // prevTonePos = (m_current - 1) - (VSeqList[vs].len - 1) + getTonePosition(vs, true);
+            prevTonePos =
                 (m_current - 1) - (vsInfo.length - 1)
                 + getTonePosition(vs, terminated: true)
             tone = m_buffer[prevTonePos].tone
@@ -1332,7 +1384,7 @@ public class UkEngine {
 
             if newVs != .none && prev.form == .cv {
                 if prev.c1Offset >= 0 {
-                    let cs = m_buffer[m_current - 1 - prev.c1Offset].cseq
+                    cs = m_buffer[m_current - 1 - prev.c1Offset].cseq
                     if !isValidCV(cs, newVs) {
                         newVs = .none
                     }
@@ -1348,7 +1400,11 @@ public class UkEngine {
             }
 
             entry.form = prev.form
-            entry.c1Offset = (prev.form == .cv) ? prev.c1Offset + 1 : -1
+            if prev.form == .cv {
+                entry.c1Offset = prev.c1Offset + 1
+            } else {
+                entry.c1Offset = -1
+            }
             entry.c2Offset = -1
             entry.vOffset = 0
             entry.vseq = newVs
@@ -1356,65 +1412,50 @@ public class UkEngine {
 
             newTone = (lowerSym.rawValue - canSym.rawValue) / 2
 
+            // Commit entry to buffer before tone manipulation to handle indexes safely
+            m_buffer[m_current] = entry
+
             if tone == 0 {
                 if newTone != 0 {
                     tone = newTone
-                    let tonePos =
+                    // tonePos = getTonePosition(newVs, true) + ((m_current - 1) - VSeqList[vs].len + 1);
+                    tonePos =
                         getTonePosition(newVs, terminated: true)
                         + ((m_current - 1) - vsInfo.length + 1)
-                    // Wait, logic in C++: tonePos = getTonePosition(...) + ...
-                    // Correct.
-                    // But we need buffer index.
-                    // C++: tonePos is absolute index?
-                    // "tonePos = getTonePosition(newVs, true) + ((m_current - 1) - VSeqList[vs].len + 1);"
-                    // (m_current - 1) is index of previous char.
-                    // VSeqList[vs].len is length of PREVIOUS sequence.
-                    // So ((m_current - 1) - len + 1) is START of sequence.
-                    // Correct.
-
-                    // We need newVs info for getTonePosition? Yes.
-                    // But C++ uses getTonePosition(newVs, true).
-                    // Wait, tonePos depends on newVs structure.
-                    // If newVs is length 2 (extended), and previous was length 1.
-                    // The start index is the same.
-
                     markChange(tonePos)
-                    m_buffer[m_current] = entry  // Save entry before accessing buffer potentially?
-                    // No, tonePos is previous char usually.
-                    // But wait, tonePos is calculated based on start.
-                    // We must ensure buffer at tonePos is valid.
-                    // If tonePos == m_current, we are setting tone on current.
-                    // Yes.
-
-                    m_buffer[m_current] = entry  // Commit current
                     m_buffer[tonePos].tone = tone
                     return 1
                 }
             } else {
-                let newTonePos =
+                newTonePos =
                     getTonePosition(newVs, terminated: true)
                     + ((m_current - 1) - vsInfo.length + 1)
                 if newTonePos != prevTonePos {
                     markChange(prevTonePos)
                     m_buffer[prevTonePos].tone = 0
                     markChange(newTonePos)
-                    if newTone != 0 { tone = newTone }
-                    m_buffer[m_current] = entry
+                    if newTone != 0 {
+                        tone = newTone
+                    }
                     m_buffer[newTonePos].tone = tone
                     return 1
                 }
                 if newTone != 0 && newTone != tone {
                     tone = newTone
                     markChange(prevTonePos)
-                    m_buffer[m_current] = entry
                     m_buffer[prevTonePos].tone = tone
                     return 1
                 }
             }
 
+            // If satisfied, we return here? No, C++ breaks out of switch and returns at end.
+            // Wait, C++ returns 1 inside the tone blocks.
+            // But if tone blocks are skipped (no tone change), it flow out of switch.
+            break
+
         case .c:
             newVs = lookupVowelSeq(canSym)
-            let cs = prev.cseq
+            cs = prev.cseq
             if !isValidCV(cs, newVs) {
                 entry.form = .nonVn
                 entry.c1Offset = -1
@@ -1430,15 +1471,36 @@ public class UkEngine {
             entry.vseq = newVs
 
             if cs == .gi && prev.tone != 0 {
-                if entry.tone == 0 { entry.tone = prev.tone }
+                if entry.tone == 0 {
+                    entry.tone = prev.tone
+                }
                 markChange(m_current - 1)
                 m_buffer[m_current - 1].tone = 0
+                // We need to commit entry here because we return 1
                 m_buffer[m_current] = entry
                 return 1
             }
+            break
         }
 
         m_buffer[m_current] = entry
+
+        // Replicating C++ check at the end
+        if !autoCompleted && ctrl.vietKey != 0 {
+            let isAlpha =
+                (entry.keyCode >= 65 && entry.keyCode <= 90)
+                || (entry.keyCode >= 97 && entry.keyCode <= 122)
+            // C++: if (!autoCompleted && (charset != ..) && isalpha) return 0
+            // But simpler here:
+            // If we failed to form a word (form is nonVn?), C++ doesn't check form here.
+            // It just checks if it's alpha.
+            // Wait, if it *is* alpha, it returns 0.
+            // This means "treat as normal char" if we fell through?
+            if isAlpha {
+                return 0
+            }
+        }
+
         markChange(m_current)
         return 1
     }
@@ -1494,7 +1556,7 @@ public class UkEngine {
             return 1
 
         case .v, .cv:
-            var vs = prev.vseq
+            let vs = prev.vseq
             var newVs = vs
             if vs == .uoh || vs == .uho {
                 newVs = .uhoh
