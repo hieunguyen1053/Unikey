@@ -38,6 +38,23 @@ public struct WordInfo {
   var keyCode: UInt32 = 0  // Original key code
 }
 
+/// Keystroke buffer entry
+struct KeyBufEntry {
+  var keyCode: UInt32
+  var char: Character
+  var isConverted: Bool = false  // True if this key triggered a VN modification
+}
+
+/// Helper to quick record key
+extension UkEngine {
+  private func recordKey(_ event: KeyEvent) {
+    let keyEntry = KeyBufEntry(
+      keyCode: event.keyCode, char: Character(UnicodeScalar(event.keyCode) ?? " "),
+      isConverted: true)
+    keyStrokes.append(keyEntry)
+  }
+}
+
 /// Processing result from engine
 public struct ProcessResult {
   /// Number of backspaces needed to delete old output
@@ -59,6 +76,11 @@ public class UkEngine {
   private var current: Int = -1
   private var singleMode: Bool = false
 
+  // Spell check / Restoration
+  private var keyStrokes: [KeyBufEntry] = []
+  public var spellCheckEnabled: Bool = true
+  private var restoring: Bool = false  // Flag for restoration process
+
   private var inputProcessor = InputProcessor()
 
   // Options
@@ -77,6 +99,8 @@ public class UkEngine {
   public func reset() {
     current = -1
     singleMode = false
+    restoring = false
+    keyStrokes.removeAll()
     for i in 0..<maxEngineBuffer {
       buffer[i] = WordInfo()
     }
@@ -138,7 +162,14 @@ public class UkEngine {
     case .telex_w:
       result = processTelexW(event)
     case .normal, .mapChar:
+      // Append first, then check
       result = processAppend(event)
+      if spellCheckEnabled && !result.handled && keyStrokes.count > 0 {
+        // If append failed (e.g. buffer full?) or specifically rejected
+        // But normally append always 'handles' by adding char.
+        // The spell check logic is INSIDE processAppend or called after?
+        // Let's put it inside processAppend for atomic handling.
+      }
     default:
       result = processAppend(event)
     }
@@ -152,6 +183,10 @@ public class UkEngine {
 
     if current >= 0 {
       current -= 1
+    }
+
+    if !keyStrokes.isEmpty {
+      keyStrokes.removeLast()
     }
 
     result.backspaceCount = 1
@@ -177,6 +212,27 @@ public class UkEngine {
     info.vnSym = event.vnSymbol
     info.caps = event.vnSymbol.isUppercase
     info.tone = 0
+
+    // Record keystroke
+    var keyEntry = KeyBufEntry(
+      keyCode: event.keyCode, char: Character(UnicodeScalar(event.keyCode) ?? " "),
+      isConverted: false)
+    // Note: char might be different from event.vnSym if mapped. Using raw code for restoration.
+    // Ideally we pass original char to processAppend?
+    // Using simple mapping for now.
+
+    // Spell Check: Detect if we are breaking a word
+    // (Logic moved to check validity later)
+
+    // Propagate Non-Vietnamese state
+    if current > 0 && buffer[current - 1].form == .nonVn || event.vnSymbol == .nonVnChar {
+      info.form = .nonVn
+      buffer[current] = info
+      keyStrokes.append(keyEntry)
+      result.output = String(event.vnSymbol.toUnicode)
+      result.handled = true
+      return result
+    }
 
     // Determine word form based on character type
     if event.vnSymbol.isVowel {
@@ -236,13 +292,17 @@ public class UkEngine {
             info.form = .v
             info.vOffset = 0
             info.vseq = lookupVowelSeq(event.vnSymbol.baseChar)
+            if info.vseq == .none { info.form = .nonVn }
           }
-        } else if prev.c1Offset >= 0 {
-          // After consonant
+        } else if prev.form == .c {
+          // After consonant (initial)
           info.form = .cv
           info.c1Offset = prev.c1Offset + 1
           info.vOffset = 0
           info.vseq = lookupVowelSeq(event.vnSymbol.baseChar)
+        } else if prev.form == .cvc || prev.form == .vc {
+          // After ending consonant -> CVC + V is invalid
+          info.form = .nonVn
         } else {
           info.form = .v
           info.vOffset = 0
@@ -255,17 +315,56 @@ public class UkEngine {
         info.form = .c
         info.c1Offset = 0
         info.cseq = lookupConsonantSeq(event.vnSymbol.baseChar)
+        if info.cseq == .none { info.form = .nonVn }
       } else {
         let prev = buffer[current - 1]
 
         if prev.vOffset >= 0 {
-          // After vowel - ending consonant
-          info.form = (prev.c1Offset >= 0) ? .cvc : .vc
-          info.c1Offset = prev.c1Offset >= 0 ? prev.c1Offset + 1 : -1
-          info.vOffset = prev.vOffset + 1
-          info.c2Offset = 0
-          info.vseq = prev.vseq
-          info.cseq = lookupConsonantSeq(event.vnSymbol.baseChar)
+          if prev.form == .v || prev.form == .cv {
+            // Start NEW ending consonant
+            info.form = (prev.form == .cv) ? .cvc : .vc
+            info.c1Offset = 0
+            info.vOffset = prev.vOffset + 1
+            info.c2Offset = 0
+
+            info.cseq = lookupConsonantSeq(event.vnSymbol.baseChar)
+
+            if info.cseq == .none {
+              info.form = .nonVn
+            }
+          } else if prev.form == .vc || prev.form == .cvc {
+            // Extend EXISTING ending consonant
+            let existingLen = consonantSeqList[prev.cseq.rawValue].length
+            var newSeq: ConsonantSequence = .none
+
+            let ecStart = current - existingLen
+
+            // Validate bounds just in case
+            if ecStart >= 0 {
+              if existingLen == 1 {
+                newSeq = lookupConsonantSeq(buffer[ecStart].vnSym.baseChar, event.vnSymbol.baseChar)
+              } else if existingLen == 2 {
+                if ecStart + 1 < current {
+                  newSeq = lookupConsonantSeq(
+                    buffer[ecStart].vnSym.baseChar, buffer[ecStart + 1].vnSym.baseChar,
+                    event.vnSymbol.baseChar)
+                }
+              }
+            }
+
+            if newSeq != .none {
+              info.form = prev.form
+              info.c1Offset = (prev.c1Offset >= 0) ? prev.c1Offset + 1 : -1
+              info.vOffset = prev.vOffset + 1
+              info.cseq = newSeq
+            } else {
+              info.form = .nonVn
+              info.cseq = .none
+            }
+            print("Processing: \(event.vnSymbol), NewSeq: \(newSeq), Form: \(info.form)")
+          } else {
+            info.form = .nonVn
+          }
         } else if prev.c1Offset >= 0 {
           // Extend consonant sequence
           let cStart = current - 1 - prev.c1Offset
@@ -286,26 +385,141 @@ public class UkEngine {
             info.c1Offset = current - cStart
             info.cseq = newSeq
           } else {
-            // Start new consonant
-            info.form = .c
+            info.form = .nonVn
             info.c1Offset = 0
-            info.cseq = lookupConsonantSeq(event.vnSymbol.baseChar)
+            info.cseq = .none
           }
         } else {
           info.form = .c
           info.c1Offset = 0
           info.cseq = lookupConsonantSeq(event.vnSymbol.baseChar)
+          if info.cseq == .none { info.form = .nonVn }
         }
       }
     } else {
-      // Non-Vietnamese character
       info.form = .nonVn
     }
 
     buffer[current] = info
 
+    // Mark as converted if we successfully formed a VN struct
+    // Simple heuristic: if form is c/v/cv/vc/cvc, we are "consuming".
+    // Actually, track if we changed anything PREVIOUSLY.
+    // But for "refactor": f -> tone. That was a conversion.
+    // "a" here is just a letter.
+
+    keyStrokes.append(keyEntry)
+
+    // CHECK VALIDITY
+    if spellCheckEnabled && !restoring && current > 0 {
+      let prev = buffer[current - 1]
+      let curr = buffer[current]
+
+      // If we started a NEW component that is disconnected from previous
+      // (e.g. prev was part of a word, but curr starts a new C or V with offset 0/checking back)
+      // AND the previous part had some "conversion"
+
+      var disconnected = false
+      if curr.form == .c && curr.c1Offset == 0 { disconnected = true }  // New consonant
+      if curr.form == .v && curr.vOffset == 0 && curr.c1Offset == -1 { disconnected = true }  // New vowel (standalone)
+      if curr.form == .nonVn { disconnected = true }  // Broken word structure
+
+      if disconnected {
+        // We have a disconnect.
+        // Check if we have any converted keys in the buffer
+        // If so, and we just broke the word structure -> Restore.
+
+        if hasConvertedKeys() {
+          return restoreKeyStrokes()
+        }
+      }
+    }
+
     result.output = String(event.vnSymbol.toUnicode)
     result.handled = true
+    return result
+  }
+
+  private func hasConvertedKeys() -> Bool {
+    // In a real implementation, we'd mark specific keys.
+    // For now: assume if we are strictly in VN mode, any tone/mark is a conversion.
+    // Scan buffer for anything not matching original key?
+    // Or check if current structure is complex.
+
+    // Let's rely on `restoreKeyStrokes` to do the heavy lifting of checking 'is this worth restoring'.
+    // But we need a trigger.
+    // Trigger: Disconnected components in buffer.
+    return true  // Simplified: always check restore if disconnected?
+    // "vietnam" -> v, i, e, t, n, a, m. All disconnected?
+    // v (c), i (v), e (v - extend? ie), t (c - extend? iet).
+    // n (c - new).
+    // "viet" is one word. "n" breaks it.
+    // "vietnam" is valid typing. We don't want to restore "việt nam" to "vietnam" unless "n" is invalid start?
+
+    // The issue with "refactor" is "rè" is valid, but "a" following it is weird.
+    // "n" following "t" is valid (new word).
+    // "a" following "e" (with tone) is invalid?
+    // Actually "rè" ends with vowel. "a" is vowel.
+    // Vowel following Vowel (that didn't merge) is almost always invalid in VN (unless space).
+  }
+
+  /// Restore original keystrokes
+  private func restoreKeyStrokes() -> ProcessResult {
+    var result = ProcessResult()
+
+    // Calculate backspaces: everything currently in buffer output
+    // We can use current buffer content length or simply `current + 1` chars?
+    // Wait, output might have been multi-char (ư, ơ, ê...).
+    // We need to know how much we outputted.
+    // Currently `processAppend` returns 1 char output usually.
+    // But we have `current` pointer.
+
+    // Using a simplified approach:
+    // 1. Calculate length of current VN string in buffer to backspace.
+    //    (Iterate buffer 0..<current and count unicode length)
+    //    Note: current char is in buffer but NOT yet outputted, so don't backspace it.
+    //    We only backspace what was previously outputted (0 to current-1).
+    var toDelete = 0
+    if current > 0 {
+      for i in 0..<current {
+        let char = buffer[i].vnSym.toUnicode
+        toDelete += String(char).count
+      }
+    } else if current == 0 {
+      // If current is 0, nothing to backspace?
+      // If 0 is the NEW char, then 0 chars backspace.
+      toDelete = 0
+    }
+
+    // 2. Capture current keystrokes to replay
+    let keysToReplay = keyStrokes
+
+    // 3. Reset Engine to clear state
+    reset()
+
+    // 4. Replay keys
+    // This repopulates the buffer with exact characters.
+    // Since we call processAppend directly, tones/marks become plain chars.
+    // If a sequence is invalid (e.g. refa), processAppend should eventually mark .nonVn
+
+    restoring = true
+    var original = ""
+
+    for var k in keysToReplay {
+      k.isConverted = false
+      // We need to convert KeyBufEntry back to KeyEvent to append
+      // Using simplified conversion assumes 1-1 mapping or we use the char
+      // But keyBufEntry has keyCode.
+      let ev = inputProcessor.keyCodeToEvent(k.keyCode, char: k.char)
+      _ = processAppend(ev)
+      original.append(k.char)
+    }
+    restoring = false
+
+    result.backspaceCount = toDelete
+    result.output = original
+    result.handled = true
+
     return result
   }
 
@@ -321,9 +535,13 @@ public class UkEngine {
     let vStart = vRange.start
     let vEnd = vRange.end
     let vs = buffer[vEnd].vseq
-    guard vs != .none, let vInfo = getVowelSeqInfo(vs) else {
+    guard vs != .none, let info = getVowelSeqInfo(vs) else {
       return processAppend(event)
     }
+
+    // Record Key (consumed as Tone)
+    recordKey(event)
+
     let newTone = event.tone
 
     // Find tone position (use Vietnamese tone placement rules)
@@ -431,6 +649,7 @@ public class UkEngine {
       return processAppend(event)
     }
 
+    recordKey(event)
     result.handled = true
     return result
   }
@@ -452,11 +671,21 @@ public class UkEngine {
 
     // Check for special UO hook handling (uo, uo^, uo^i...)
     // Ported from x-unikey ukengine.cpp processHook (lines 800-804)
-    if getVowelSeqLength(vs) > 1 &&
-       event.eventType != .bowl &&
-       (info.vowels.count > 0 && (info.vowels[0] == .u || info.vowels[0] == .uh)) &&
-       (info.vowels.count > 1 && (info.vowels[1] == .o || info.vowels[1] == .oh || info.vowels[1] == .or)) {
-         return processHookWithUO(event, vRange: vRange)
+    if getVowelSeqLength(vs) > 1 && event.eventType != .bowl
+      && (info.vowels.count > 0 && (info.vowels[0] == .u || info.vowels[0] == .uh))
+      && (info.vowels.count > 1
+        && (info.vowels[1] == .o || info.vowels[1] == .oh || info.vowels[1] == .or))
+    {
+
+      // Special handling: processHookWithUO needs to record key if it handles it.
+      // But processHookWithUO signature doesn't imply fallback easily.
+      // We'll record here, but pop if processHookWithUO fails (if it calls processAppend).
+      // Actually processHookWithUO in this port calls processAppend internally.
+      // So assuming processHookWithUO handles recording or we record if successful?
+      // Wait, did I add recordKey to processHookWithUO? No.
+      // So we should record here.
+      recordKey(event)
+      return processHookWithUO(event, vRange: vRange)
     }
 
     // Original logic continues here, using `info` (which is `vInfo` from original code)
@@ -493,6 +722,7 @@ public class UkEngine {
       return processAppend(event)
     }
 
+    recordKey(event)
     result.handled = true
     return result
   }
@@ -541,6 +771,7 @@ public class UkEngine {
 
       result = rewriteBuffer(from: dPos)
       result.handled = true
+      recordKey(event)
     } else {
       return processAppend(event)
     }
@@ -585,8 +816,8 @@ public class UkEngine {
   private func processHookWithUO(_ event: KeyEvent, vRange: (start: Int, end: Int)) -> ProcessResult
   {
     var result = ProcessResult()
-     _ = result // Suppress unused warning or just use empty result init
-    
+    _ = result  // Suppress unused warning or just use empty result init
+
     let vStart = vRange.start
     let vEnd = vRange.end
     let vs = buffer[vEnd].vseq

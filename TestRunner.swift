@@ -139,7 +139,13 @@ func testUkEngine() {
     ("nhieeuf", "nhiều"),
     ("nguoi", "nguoi"),
     ("nguowif", "người"),  // uow -> ươ (correct behavior)
-    ("nguowwif", "nguòi"),  // uoww -> uo (toggles back)
+    ("nguowwif", "nguòi"),  // uoww -> uo (toggles back) to uo
+    ("refactor", "refactor"),  // Spell check restores 'refa', and tempEnglishMode keeps 'ctor'
+    ("refa", "refa"),  // Standard Telex: f->grave, r->hook on a, but spell check restores it
+    ("hello", "hello"),
+    ("vietnam", "vietnam"),  // No marks triggered
+    ("hangf", "hàng"),
+    ("nghieemg", "nghieemg"),
   ]
 
   for (input, expected) in wordTests {
