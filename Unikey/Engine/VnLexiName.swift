@@ -7,39 +7,40 @@ import Foundation
 
 public enum VnLexiName: Int, CaseIterable {
     case nonVnChar = -1
-    
-    case A = 0, a, A1, a1, A2, a2, A3, a3, A4, a4, A5, a5
+
+    case A = 0
+    case a, A1, a1, A2, a2, A3, a3, A4, a4, A5, a5
     case Ar, ar, Ar1, ar1, Ar2, ar2, Ar3, ar3, Ar4, ar4, Ar5, ar5
     case Ab, ab, Ab1, ab1, Ab2, ab2, Ab3, ab3, Ab4, ab4, Ab5, ab5
-    
+
     case B, b, C, c
-    
+
     case D, d, DD, dd
-    
+
     case E, e, E1, e1, E2, e2, E3, e3, E4, e4, E5, e5
     case Er, er, Er1, er1, Er2, er2, Er3, er3, Er4, er4, Er5, er5
-    
+
     case F, f, G, g, H, h
-    
+
     case I, i, I1, i1, I2, i2, I3, i3, I4, i4, I5, i5
-    
+
     case J, j, K, k, L, l, M, m, N, n
-    
+
     case O, o, O1, o1, O2, o2, O3, o3, O4, o4, O5, o5
     case Or, or, Or1, or1, Or2, or2, Or3, or3, Or4, or4, Or5, or5
     case Oh, oh, Oh1, oh1, Oh2, oh2, Oh3, oh3, Oh4, oh4, Oh5, oh5
-    
+
     case P, p, Q, q, R, r, S, s, T, t
-    
+
     case U, u, U1, u1, U2, u2, U3, u3, U4, u4, U5, u5
     case Uh, uh, Uh1, uh1, Uh2, uh2, Uh3, uh3, Uh4, uh4, Uh5, uh5
-    
+
     case V, v, W, w, X, x
-    
+
     case Y, y, Y1, y1, Y2, y2, Y3, y3, Y4, y4, Y5, y5
-    
+
     case Z, z
-    
+
     case lastChar
 }
 
@@ -57,7 +58,7 @@ extension VnLexiName {
             return false
         }
     }
-    
+
     public var isUpper: Bool {
         // Simple heuristic based on enum definition
         // Base chars A, Ar, Ab, B, C, D, DD, E, Er, F, G, H, I, J, K, L, M, N, O, Or, Oh, P, Q, R, S, T, U, Uh, V, W, X, Y, Z
@@ -89,7 +90,7 @@ extension VnLexiName {
         // Ar=12...ar5=23.
         // etc.
         let val = self.rawValue
-        
+
         // Ranges
         if val >= VnLexiName.A.rawValue && val <= VnLexiName.a5.rawValue {
             return isUpper ? .A : .a
@@ -136,7 +137,7 @@ extension VnLexiName {
 
         return self
     }
-    
+
     public var tone: Int {
         // Return 0-5
         let base = self.baseChar
@@ -145,7 +146,7 @@ extension VnLexiName {
         let diff = self.rawValue - base.rawValue
         // A=0, A1=2, A2=4...
         // diff is 2 * tone
-        if diff < 0 { return 0 } // Should not happen
+        if diff < 0 { return 0 }  // Should not happen
         return diff / 2
     }
 
@@ -154,7 +155,7 @@ extension VnLexiName {
         let base = self.baseChar
         // Check if this char supports tone (is in one of the ranges)
         if !base.isVowel { return self }
-        
+
         // Calculate new value
         let newVal = base.rawValue + (tone * 2)
         return VnLexiName(rawValue: newVal) ?? self
@@ -182,12 +183,12 @@ extension VnLexiName {
         }
         return self
     }
-    
+
     public var withoutRoof: VnLexiName {
         let tone = self.tone
         let isUp = self.isUpper
         let root = self.baseChar
-        
+
         // Ar -> A, Er -> E, Or -> O
         var targetRoot: VnLexiName?
 
@@ -203,7 +204,7 @@ extension VnLexiName {
         }
         return self
     }
-    
+
     public var withHook: VnLexiName {
         let tone = self.tone
         let isUp = self.isUpper
@@ -228,7 +229,7 @@ extension VnLexiName {
         }
         return self
     }
-    
+
     public var withoutHook: VnLexiName {
         let tone = self.tone
         let isUp = self.isUpper
@@ -246,7 +247,7 @@ extension VnLexiName {
         }
         return self
     }
-    
+
     public var withBreve: VnLexiName {
         let tone = self.tone
         let isUp = self.isUpper

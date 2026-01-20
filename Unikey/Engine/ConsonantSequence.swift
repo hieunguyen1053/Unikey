@@ -28,7 +28,7 @@ public enum ConsonantSequence: Int, CaseIterable {
 public struct ConsonantSeqInfo {
     public var length: Int
     public var consonants: [VnLexiName]
-    public var suffix: Bool // Can be a suffix
+    public var suffix: Bool  // Can be a suffix
 
     public init(length: Int, consonants: [VnLexiName], suffix: Bool = false) {
         self.length = length
@@ -68,7 +68,7 @@ private let consonantSeqTable: [ConsonantSequence: ConsonantSeqInfo] = [
     .th: ConsonantSeqInfo(length: 2, consonants: [.t, .h], suffix: false),
     .tr: ConsonantSeqInfo(length: 2, consonants: [.t, .r], suffix: false),
     .v: ConsonantSeqInfo(length: 1, consonants: [.v], suffix: false),
-    .x: ConsonantSeqInfo(length: 1, consonants: [.x], suffix: false)
+    .x: ConsonantSeqInfo(length: 1, consonants: [.x], suffix: false),
 ]
 
 // Note: `consonantSeqList` in UkEngine.swift was used as array.
@@ -94,7 +94,9 @@ public var consonantSeqList: [ConsonantSeqInfo] {
     let maxRaw = ConsonantSequence.allCases.map { $0.rawValue }.max() ?? 0
     // Fill array
     for i in 0...maxRaw {
-        if let seq = ConsonantSequence(rawValue: i), let info = consonantSeqTable[seq] {
+        if let seq = ConsonantSequence(rawValue: i),
+            let info = consonantSeqTable[seq]
+        {
             list.append(info)
         } else {
             // Should not happen if sparse
@@ -104,12 +106,15 @@ public var consonantSeqList: [ConsonantSeqInfo] {
     return list
 }
 
-
 public func getConsonantSeqInfo(_ seq: ConsonantSequence) -> ConsonantSeqInfo? {
     return consonantSeqTable[seq]
 }
 
-public func lookupConsonantSeq(_ c1: VnLexiName, _ c2: VnLexiName = .nonVnChar, _ c3: VnLexiName = .nonVnChar) -> ConsonantSequence {
+public func lookupConsonantSeq(
+    _ c1: VnLexiName,
+    _ c2: VnLexiName = .nonVnChar,
+    _ c3: VnLexiName = .nonVnChar
+) -> ConsonantSequence {
     let b1 = c1.baseChar
     let b2 = c2.baseChar
     let b3 = c3.baseChar
@@ -124,12 +129,18 @@ public func lookupConsonantSeq(_ c1: VnLexiName, _ c2: VnLexiName = .nonVnChar, 
     } else if b3 == .nonVnChar {
         // Double
         for (seq, info) in consonantSeqTable where info.length == 2 {
-            if info.consonants[0] == b1 && info.consonants[1] == b2 { return seq }
+            if info.consonants[0] == b1 && info.consonants[1] == b2 {
+                return seq
+            }
         }
     } else {
         // Triple
         for (seq, info) in consonantSeqTable where info.length == 3 {
-            if info.consonants[0] == b1 && info.consonants[1] == b2 && info.consonants[2] == b3 { return seq }
+            if info.consonants[0] == b1 && info.consonants[1] == b2
+                && info.consonants[2] == b3
+            {
+                return seq
+            }
         }
     }
     return .none

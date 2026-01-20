@@ -10,7 +10,8 @@ import Foundation
 public let MAX_UK_ENGINE = 128
 
 public enum VnWordForm: Int {
-    case nonVn = 0, empty, c, v, cv, vc, cvc
+    case nonVn = 0
+    case empty, c, v, cv, vc, cvc
 }
 
 public enum UkOutputType: Int {
@@ -21,8 +22,8 @@ public struct UnikeyOptions {
     public var vietKeyEnabled: Bool = true
     public var freeMarking: Bool = true
     public var spellCheckEnabled: Bool = true
-    public var modernStyle: Bool = true // oa, oe, uy tone pos
-    public var allowUoa: Bool = false // allow uoa (uòa) style
+    public var modernStyle: Bool = true  // oa, oe, uy tone pos
+    public var allowUoa: Bool = false  // allow uoa (uòa) style
     public var macroEnabled: Bool = true
     public var autoNonVnRestore: Bool = true
 
@@ -71,7 +72,9 @@ public struct WordInfo {
     var keyCode: UInt32 = 0
 }
 
-public typealias CheckKeyboardCaseCb = (_ shiftPressed: inout Int, _ capslockOn: inout Int) -> Void
+public typealias CheckKeyboardCaseCb = (
+    _ shiftPressed: inout Int, _ capslockOn: inout Int
+) -> Void
 
 // MARK: - Validation Tables
 
@@ -81,50 +84,79 @@ private struct VCPair: Hashable {
 }
 
 private let validVCPairs: Set<VCPair> = [
-    VCPair(v: .a, c: .c), VCPair(v: .a, c: .ch), VCPair(v: .a, c: .m), VCPair(v: .a, c: .n), VCPair(v: .a, c: .ng), VCPair(v: .a, c: .nh), VCPair(v: .a, c: .p), VCPair(v: .a, c: .t),
-    VCPair(v: .ar, c: .c), VCPair(v: .ar, c: .m), VCPair(v: .ar, c: .n), VCPair(v: .ar, c: .ng), VCPair(v: .ar, c: .p), VCPair(v: .ar, c: .t),
-    VCPair(v: .ab, c: .c), VCPair(v: .ab, c: .m), VCPair(v: .ab, c: .n), VCPair(v: .ab, c: .ng), VCPair(v: .ab, c: .p), VCPair(v: .ab, c: .t),
+    VCPair(v: .a, c: .c), VCPair(v: .a, c: .ch), VCPair(v: .a, c: .m),
+    VCPair(v: .a, c: .n), VCPair(v: .a, c: .ng), VCPair(v: .a, c: .nh),
+    VCPair(v: .a, c: .p), VCPair(v: .a, c: .t),
+    VCPair(v: .ar, c: .c), VCPair(v: .ar, c: .m), VCPair(v: .ar, c: .n),
+    VCPair(v: .ar, c: .ng), VCPair(v: .ar, c: .p), VCPair(v: .ar, c: .t),
+    VCPair(v: .ab, c: .c), VCPair(v: .ab, c: .m), VCPair(v: .ab, c: .n),
+    VCPair(v: .ab, c: .ng), VCPair(v: .ab, c: .p), VCPair(v: .ab, c: .t),
 
-    VCPair(v: .e, c: .c), VCPair(v: .e, c: .ch), VCPair(v: .e, c: .m), VCPair(v: .e, c: .n), VCPair(v: .e, c: .ng), VCPair(v: .e, c: .nh), VCPair(v: .e, c: .p), VCPair(v: .e, c: .t),
-    VCPair(v: .er, c: .c), VCPair(v: .er, c: .ch), VCPair(v: .er, c: .m), VCPair(v: .er, c: .n), VCPair(v: .er, c: .nh), VCPair(v: .er, c: .p), VCPair(v: .er, c: .t),
+    VCPair(v: .e, c: .c), VCPair(v: .e, c: .ch), VCPair(v: .e, c: .m),
+    VCPair(v: .e, c: .n), VCPair(v: .e, c: .ng), VCPair(v: .e, c: .nh),
+    VCPair(v: .e, c: .p), VCPair(v: .e, c: .t),
+    VCPair(v: .er, c: .c), VCPair(v: .er, c: .ch), VCPair(v: .er, c: .m),
+    VCPair(v: .er, c: .n), VCPair(v: .er, c: .nh), VCPair(v: .er, c: .p),
+    VCPair(v: .er, c: .t),
 
-    VCPair(v: .i, c: .c), VCPair(v: .i, c: .ch), VCPair(v: .i, c: .m), VCPair(v: .i, c: .n), VCPair(v: .i, c: .nh), VCPair(v: .i, c: .p), VCPair(v: .i, c: .t),
+    VCPair(v: .i, c: .c), VCPair(v: .i, c: .ch), VCPair(v: .i, c: .m),
+    VCPair(v: .i, c: .n), VCPair(v: .i, c: .nh), VCPair(v: .i, c: .p),
+    VCPair(v: .i, c: .t),
 
-    VCPair(v: .o, c: .c), VCPair(v: .o, c: .m), VCPair(v: .o, c: .n), VCPair(v: .o, c: .ng), VCPair(v: .o, c: .p), VCPair(v: .o, c: .t),
-    VCPair(v: .or, c: .c), VCPair(v: .or, c: .m), VCPair(v: .or, c: .n), VCPair(v: .or, c: .ng), VCPair(v: .or, c: .p), VCPair(v: .or, c: .t),
-    VCPair(v: .oh, c: .m), VCPair(v: .oh, c: .n), VCPair(v: .oh, c: .p), VCPair(v: .oh, c: .t),
+    VCPair(v: .o, c: .c), VCPair(v: .o, c: .m), VCPair(v: .o, c: .n),
+    VCPair(v: .o, c: .ng), VCPair(v: .o, c: .p), VCPair(v: .o, c: .t),
+    VCPair(v: .or, c: .c), VCPair(v: .or, c: .m), VCPair(v: .or, c: .n),
+    VCPair(v: .or, c: .ng), VCPair(v: .or, c: .p), VCPair(v: .or, c: .t),
+    VCPair(v: .oh, c: .m), VCPair(v: .oh, c: .n), VCPair(v: .oh, c: .p),
+    VCPair(v: .oh, c: .t),
 
-    VCPair(v: .u, c: .c), VCPair(v: .u, c: .m), VCPair(v: .u, c: .n), VCPair(v: .u, c: .ng), VCPair(v: .u, c: .p), VCPair(v: .u, c: .t),
-    VCPair(v: .uh, c: .c), VCPair(v: .uh, c: .m), VCPair(v: .uh, c: .n), VCPair(v: .uh, c: .ng), VCPair(v: .uh, c: .t),
+    VCPair(v: .u, c: .c), VCPair(v: .u, c: .m), VCPair(v: .u, c: .n),
+    VCPair(v: .u, c: .ng), VCPair(v: .u, c: .p), VCPair(v: .u, c: .t),
+    VCPair(v: .uh, c: .c), VCPair(v: .uh, c: .m), VCPair(v: .uh, c: .n),
+    VCPair(v: .uh, c: .ng), VCPair(v: .uh, c: .t),
 
     VCPair(v: .y, c: .t),
 
-    VCPair(v: .ie, c: .c), VCPair(v: .ie, c: .m), VCPair(v: .ie, c: .n), VCPair(v: .ie, c: .ng), VCPair(v: .ie, c: .p), VCPair(v: .ie, c: .t),
-    VCPair(v: .ier, c: .c), VCPair(v: .ier, c: .m), VCPair(v: .ier, c: .n), VCPair(v: .ier, c: .ng), VCPair(v: .ier, c: .p), VCPair(v: .ier, c: .t),
+    VCPair(v: .ie, c: .c), VCPair(v: .ie, c: .m), VCPair(v: .ie, c: .n),
+    VCPair(v: .ie, c: .ng), VCPair(v: .ie, c: .p), VCPair(v: .ie, c: .t),
+    VCPair(v: .ier, c: .c), VCPair(v: .ier, c: .m), VCPair(v: .ier, c: .n),
+    VCPair(v: .ier, c: .ng), VCPair(v: .ier, c: .p), VCPair(v: .ier, c: .t),
 
-    VCPair(v: .oa, c: .c), VCPair(v: .oa, c: .ch), VCPair(v: .oa, c: .m), VCPair(v: .oa, c: .n), VCPair(v: .oa, c: .ng), VCPair(v: .oa, c: .nh), VCPair(v: .oa, c: .p), VCPair(v: .oa, c: .t),
-    VCPair(v: .oab, c: .c), VCPair(v: .oab, c: .m), VCPair(v: .oab, c: .n), VCPair(v: .oab, c: .ng), VCPair(v: .oab, c: .t),
+    VCPair(v: .oa, c: .c), VCPair(v: .oa, c: .ch), VCPair(v: .oa, c: .m),
+    VCPair(v: .oa, c: .n), VCPair(v: .oa, c: .ng), VCPair(v: .oa, c: .nh),
+    VCPair(v: .oa, c: .p), VCPair(v: .oa, c: .t),
+    VCPair(v: .oab, c: .c), VCPair(v: .oab, c: .m), VCPair(v: .oab, c: .n),
+    VCPair(v: .oab, c: .ng), VCPair(v: .oab, c: .t),
 
     VCPair(v: .oe, c: .n), VCPair(v: .oe, c: .t),
 
     VCPair(v: .ua, c: .n), VCPair(v: .ua, c: .ng), VCPair(v: .ua, c: .t),
     VCPair(v: .uar, c: .n), VCPair(v: .uar, c: .ng), VCPair(v: .uar, c: .t),
 
-    VCPair(v: .ue, c: .c), VCPair(v: .ue, c: .ch), VCPair(v: .ue, c: .n), VCPair(v: .ue, c: .nh),
-    VCPair(v: .uer, c: .c), VCPair(v: .uer, c: .ch), VCPair(v: .uer, c: .n), VCPair(v: .uer, c: .nh),
+    VCPair(v: .ue, c: .c), VCPair(v: .ue, c: .ch), VCPair(v: .ue, c: .n),
+    VCPair(v: .ue, c: .nh),
+    VCPair(v: .uer, c: .c), VCPair(v: .uer, c: .ch), VCPair(v: .uer, c: .n),
+    VCPair(v: .uer, c: .nh),
 
-    VCPair(v: .uo, c: .c), VCPair(v: .uo, c: .m), VCPair(v: .uo, c: .n), VCPair(v: .uo, c: .ng), VCPair(v: .uo, c: .p), VCPair(v: .uo, c: .t),
-    VCPair(v: .uor, c: .c), VCPair(v: .uor, c: .m), VCPair(v: .uor, c: .n), VCPair(v: .uor, c: .ng), VCPair(v: .uor, c: .t),
-    VCPair(v: .uho, c: .c), VCPair(v: .uho, c: .m), VCPair(v: .uho, c: .n), VCPair(v: .uho, c: .ng), VCPair(v: .uho, c: .p), VCPair(v: .uho, c: .t),
-    VCPair(v: .uhoh, c: .c), VCPair(v: .uhoh, c: .m), VCPair(v: .uhoh, c: .n), VCPair(v: .uhoh, c: .ng), VCPair(v: .uhoh, c: .p), VCPair(v: .uhoh, c: .t),
+    VCPair(v: .uo, c: .c), VCPair(v: .uo, c: .m), VCPair(v: .uo, c: .n),
+    VCPair(v: .uo, c: .ng), VCPair(v: .uo, c: .p), VCPair(v: .uo, c: .t),
+    VCPair(v: .uor, c: .c), VCPair(v: .uor, c: .m), VCPair(v: .uor, c: .n),
+    VCPair(v: .uor, c: .ng), VCPair(v: .uor, c: .t),
+    VCPair(v: .uho, c: .c), VCPair(v: .uho, c: .m), VCPair(v: .uho, c: .n),
+    VCPair(v: .uho, c: .ng), VCPair(v: .uho, c: .p), VCPair(v: .uho, c: .t),
+    VCPair(v: .uhoh, c: .c), VCPair(v: .uhoh, c: .m), VCPair(v: .uhoh, c: .n),
+    VCPair(v: .uhoh, c: .ng), VCPair(v: .uhoh, c: .p), VCPair(v: .uhoh, c: .t),
 
-    VCPair(v: .uy, c: .c), VCPair(v: .uy, c: .ch), VCPair(v: .uy, c: .n), VCPair(v: .uy, c: .nh), VCPair(v: .uy, c: .p), VCPair(v: .uy, c: .t),
+    VCPair(v: .uy, c: .c), VCPair(v: .uy, c: .ch), VCPair(v: .uy, c: .n),
+    VCPair(v: .uy, c: .nh), VCPair(v: .uy, c: .p), VCPair(v: .uy, c: .t),
 
-    VCPair(v: .ye, c: .m), VCPair(v: .ye, c: .n), VCPair(v: .ye, c: .ng), VCPair(v: .ye, c: .p), VCPair(v: .ye, c: .t),
-    VCPair(v: .yer, c: .m), VCPair(v: .yer, c: .n), VCPair(v: .yer, c: .ng), VCPair(v: .yer, c: .t),
+    VCPair(v: .ye, c: .m), VCPair(v: .ye, c: .n), VCPair(v: .ye, c: .ng),
+    VCPair(v: .ye, c: .p), VCPair(v: .ye, c: .t),
+    VCPair(v: .yer, c: .m), VCPair(v: .yer, c: .n), VCPair(v: .yer, c: .ng),
+    VCPair(v: .yer, c: .t),
 
     VCPair(v: .uye, c: .n), VCPair(v: .uye, c: .t),
-    VCPair(v: .uyer, c: .n), VCPair(v: .uyer, c: .t)
+    VCPair(v: .uyer, c: .n), VCPair(v: .uyer, c: .t),
 ]
 
 // MARK: - UkEngine Class
@@ -141,7 +173,10 @@ public class UkEngine {
     private var m_singleMode: Bool = false
 
     private var m_keyBufSize: Int = MAX_UK_ENGINE
-    private var m_keyStrokes: [KeyBufEntry] = Array(repeating: KeyBufEntry(), count: MAX_UK_ENGINE)
+    private var m_keyStrokes: [KeyBufEntry] = Array(
+        repeating: KeyBufEntry(),
+        count: MAX_UK_ENGINE
+    )
     private var m_keyCurrent: Int = -1
     private var m_toEscape: Bool = false
 
@@ -152,7 +187,10 @@ public class UkEngine {
     private var m_keyRestoring: Bool = false
     private var m_outType: UkOutputType = .normal
 
-    private var m_buffer: [WordInfo] = Array(repeating: WordInfo(), count: MAX_UK_ENGINE)
+    private var m_buffer: [WordInfo] = Array(
+        repeating: WordInfo(),
+        count: MAX_UK_ENGINE
+    )
 
     // MARK: - Public Methods
 
@@ -190,7 +228,13 @@ public class UkEngine {
         resetKeyBuf()
     }
 
-    public func process(_ keyCode: UInt32, _ backs: inout Int, _ outBuf: inout [UInt16], _ outSize: inout Int, _ outType: inout UkOutputType) -> Int {
+    public func process(
+        _ keyCode: UInt32,
+        _ backs: inout Int,
+        _ outBuf: inout [UInt16],
+        _ outSize: inout Int,
+        _ outType: inout UkOutputType
+    ) -> Int {
         var ev = UkKeyEvent()
         prepareBuffer()
         m_backs = 0
@@ -210,26 +254,31 @@ public class UkEngine {
 
         if !m_toEscape {
             switch ev.evType {
-             case UkKeyEvName.roofAll.rawValue, UkKeyEvName.roof_a.rawValue, UkKeyEvName.roof_e.rawValue, UkKeyEvName.roof_o.rawValue:
-                 ret = processRoof(ev)
-             case UkKeyEvName.hookAll.rawValue, UkKeyEvName.hook_uo.rawValue, UkKeyEvName.hook_u.rawValue, UkKeyEvName.hook_o.rawValue, UkKeyEvName.bowl.rawValue:
-                 ret = processHook(ev)
-             case UkKeyEvName.dd.rawValue:
-                 ret = processDd(ev)
-             case UkKeyEvName.tone0.rawValue...UkKeyEvName.tone5.rawValue:
-                 ret = processTone(ev)
-             case UkKeyEvName.telex_w.rawValue:
-                 ret = processTelexW(ev)
-             case UkKeyEvName.mapChar.rawValue:
-                 ret = processMapChar(ev)
-             case UkKeyEvName.escChar.rawValue:
-                 ret = processEscChar(ev)
-             default:
-                 ret = processAppend(ev)
+            case UkKeyEvName.roofAll.rawValue, UkKeyEvName.roof_a.rawValue,
+                UkKeyEvName.roof_e.rawValue, UkKeyEvName.roof_o.rawValue:
+                ret = processRoof(ev)
+            case UkKeyEvName.hookAll.rawValue, UkKeyEvName.hook_uo.rawValue,
+                UkKeyEvName.hook_u.rawValue, UkKeyEvName.hook_o.rawValue,
+                UkKeyEvName.bowl.rawValue:
+                ret = processHook(ev)
+            case UkKeyEvName.dd.rawValue:
+                ret = processDd(ev)
+            case UkKeyEvName.tone0.rawValue...UkKeyEvName.tone5.rawValue:
+                ret = processTone(ev)
+            case UkKeyEvName.telex_w.rawValue:
+                ret = processTelexW(ev)
+            case UkKeyEvName.mapChar.rawValue:
+                ret = processMapChar(ev)
+            case UkKeyEvName.escChar.rawValue:
+                ret = processEscChar(ev)
+            default:
+                ret = processAppend(ev)
             }
         } else {
             m_toEscape = false
-            if m_current < 0 || ev.evType == UkKeyEvName.normal.rawValue || ev.evType == UkKeyEvName.escChar.rawValue {
+            if m_current < 0 || ev.evType == UkKeyEvName.normal.rawValue
+                || ev.evType == UkKeyEvName.escChar.rawValue
+            {
                 ret = processAppend(ev)
             } else {
                 m_current -= 1
@@ -239,11 +288,11 @@ public class UkEngine {
             }
         }
 
-        if ctrl.vietKey != 0 &&
-            m_current >= 0 && m_buffer[m_current].form == .nonVn &&
-            ev.chType == .vn &&
-            (!ctrl.options.spellCheckEnabled || m_singleMode) {
-             ret = processNoSpellCheck(ev)
+        if ctrl.vietKey != 0 && m_current >= 0
+            && m_buffer[m_current].form == .nonVn && ev.chType == .vn
+            && (!ctrl.options.spellCheckEnabled || m_singleMode)
+        {
+            ret = processNoSpellCheck(ev)
         }
 
         if m_current >= 0 {
@@ -251,7 +300,8 @@ public class UkEngine {
             m_keyCurrent += 1
             if m_keyCurrent < MAX_UK_ENGINE {
                 m_keyStrokes[m_keyCurrent].ev = ev
-                m_keyStrokes[m_keyCurrent].converted = (ret != 0 && !m_keyRestored)
+                m_keyStrokes[m_keyCurrent].converted =
+                    (ret != 0 && !m_keyRestored)
             }
         }
 
@@ -273,7 +323,12 @@ public class UkEngine {
         return ret
     }
 
-    public func processBackspace(_ backs: inout Int, _ outBuf: inout [UInt16], _ outSize: inout Int, _ outType: inout UkOutputType) -> Int {
+    public func processBackspace(
+        _ backs: inout Int,
+        _ outBuf: inout [UInt16],
+        _ outSize: inout Int,
+        _ outType: inout UkOutputType
+    ) -> Int {
         outType = .normal
         guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0 else {
             backs = 0
@@ -286,13 +341,13 @@ public class UkEngine {
         m_changePos = m_current + 1
         markChange(m_current)
 
-        if m_current == 0 ||
-            m_buffer[m_current].form == .empty ||
-            m_buffer[m_current].form == .nonVn ||
-            m_buffer[m_current].form == .c ||
-            m_buffer[m_current-1].form == .c ||
-            m_buffer[m_current-1].form == .cvc ||
-            m_buffer[m_current-1].form == .vc {
+        if m_current == 0 || m_buffer[m_current].form == .empty
+            || m_buffer[m_current].form == .nonVn
+            || m_buffer[m_current].form == .c
+            || m_buffer[m_current - 1].form == .c
+            || m_buffer[m_current - 1].form == .cvc
+            || m_buffer[m_current - 1].form == .vc
+        {
 
             m_current -= 1
             backs = m_backs
@@ -305,14 +360,17 @@ public class UkEngine {
         let vs = m_buffer[vEnd].vseq
         guard let vsInfo = getVowelSeqInfo(vs) else { return 0 }
         let vStart = vEnd - vsInfo.length + 1
-        let newVs = m_buffer[m_current-1].vseq
+        let newVs = m_buffer[m_current - 1].vseq
 
-        let curTonePos = vStart + getTonePosition(vs, terminated: vEnd == m_current)
+        let curTonePos =
+            vStart + getTonePosition(vs, terminated: vEnd == m_current)
         let newTonePos = vStart + getTonePosition(newVs, terminated: true)
 
         let tone = m_buffer[curTonePos].tone
 
-        if tone == 0 || curTonePos == newTonePos || (curTonePos == m_current && m_buffer[m_current].tone != 0) {
+        if tone == 0 || curTonePos == newTonePos
+            || (curTonePos == m_current && m_buffer[m_current].tone != 0)
+        {
             m_current -= 1
             backs = m_backs
             outSize = 0
@@ -335,8 +393,13 @@ public class UkEngine {
         return 1
     }
 
-    public func restoreKeyStrokes(_ backs: inout Int, _ outBuf: inout [UInt16], _ outSize: inout Int, _ outType: inout UkOutputType) -> Int {
-        outType = .normal // UkKeyOutput in C++? C++ says UkKeyOutput but defines normal=0.
+    public func restoreKeyStrokes(
+        _ backs: inout Int,
+        _ outBuf: inout [UInt16],
+        _ outSize: inout Int,
+        _ outType: inout UkOutputType
+    ) -> Int {
+        outType = .normal  // UkKeyOutput in C++? C++ says UkKeyOutput but defines normal=0.
         // Actually C++ sets outType = UkKeyOutput. I only have .normal.
         // I should add .keyOutput to UkOutputType if needed, or just use normal.
 
@@ -451,9 +514,13 @@ public class UkEngine {
 
             if !isValidCVC(c1, vs, cs) { return true }
 
-            let tonePos = (vIndex - vsInfo.length + 1) + getTonePosition(vs, terminated: false)
+            let tonePos =
+                (vIndex - vsInfo.length + 1)
+                + getTonePosition(vs, terminated: false)
             let tone = m_buffer[tonePos].tone
-            if (cs == .c || cs == .ch || cs == .p || cs == .t) && (tone == 2 || tone == 3 || tone == 4) {
+            if (cs == .c || cs == .ch || cs == .p || cs == .t)
+                && (tone == 2 || tone == 3 || tone == 4)
+            {
                 return true
             }
         }
@@ -473,20 +540,24 @@ public class UkEngine {
 
         if entry.form == .v || entry.form == .cv {
             switch ev.keyCode {
-            case 94: // ^
-                escape = (entry.vnSym == .a || entry.vnSym == .o || entry.vnSym == .e)
-            case 40: // (
+            case 94:  // ^
+                escape =
+                    (entry.vnSym == .a || entry.vnSym == .o
+                        || entry.vnSym == .e)
+            case 40:  // (
                 escape = (entry.vnSym == .a)
-            case 43: // +
+            case 43:  // +
                 escape = (entry.vnSym == .o || entry.vnSym == .u)
-            case 39, 96, 63, 126, 46: // ' ` ? ~ .
+            case 39, 96, 63, 126, 46:  // ' ` ? ~ .
                 escape = (entry.tone == 0)
             default: break
             }
         } else if entry.form == .nonVn {
-             let ch = Charset.toUpper(Character(UnicodeScalar(entry.keyCode) ?? " "))
-             // Check...
-             // Simplified
+            let ch = Charset.toUpper(
+                Character(UnicodeScalar(entry.keyCode) ?? " ")
+            )
+            // Check...
+            // Simplified
         }
 
         if escape {
@@ -501,7 +572,9 @@ public class UkEngine {
             return 1
         }
 
-        if !ctrl.options.spellCheckEnabled || m_singleMode || m_current < 0 || m_keyRestoring {
+        if !ctrl.options.spellCheckEnabled || m_singleMode || m_current < 0
+            || m_keyRestoring
+        {
             m_current += 1
             var entry = WordInfo()
             entry.form = .empty
@@ -534,8 +607,12 @@ public class UkEngine {
             return processAppend(ev)
         }
 
-        if m_buffer[m_current].form == .c && (m_buffer[m_current].cseq == .gi || m_buffer[m_current].cseq == .gin) {
-            let p = (m_buffer[m_current].cseq == .gi) ? m_current : m_current - 1
+        if m_buffer[m_current].form == .c
+            && (m_buffer[m_current].cseq == .gi
+                || m_buffer[m_current].cseq == .gin)
+        {
+            let p =
+                (m_buffer[m_current].cseq == .gi) ? m_current : m_current - 1
             if m_buffer[p].tone == 0 && ev.tone == 0 {
                 return processAppend(ev)
             }
@@ -559,13 +636,17 @@ public class UkEngine {
         let vs = m_buffer[vEnd].vseq
         guard let info = getVowelSeqInfo(vs) else { return processAppend(ev) }
 
-        if ctrl.options.spellCheckEnabled && !ctrl.options.freeMarking && !info.complete {
+        if ctrl.options.spellCheckEnabled && !ctrl.options.freeMarking
+            && !info.complete
+        {
             return processAppend(ev)
         }
 
         if m_buffer[m_current].form == .vc || m_buffer[m_current].form == .cvc {
             let cs = m_buffer[m_current].cseq
-            if (cs == .c || cs == .ch || cs == .p || cs == .t) && (ev.tone == 2 || ev.tone == 3 || ev.tone == 4) {
+            if (cs == .c || cs == .ch || cs == .p || cs == .t)
+                && (ev.tone == 2 || ev.tone == 3 || ev.tone == 4)
+            {
                 return processAppend(ev)
             }
         }
@@ -592,7 +673,9 @@ public class UkEngine {
     }
 
     private func processRoof(_ ev: UkKeyEvent) -> Int {
-        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0, m_buffer[m_current].vOffset >= 0 else {
+        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0,
+            m_buffer[m_current].vOffset >= 0
+        else {
             return processAppend(ev)
         }
 
@@ -609,7 +692,8 @@ public class UkEngine {
         guard let info = getVowelSeqInfo(vs) else { return processAppend(ev) }
         let vStart = vEnd - (info.length - 1)
 
-        let curTonePos = vStart + getTonePosition(vs, terminated: vEnd == m_current)
+        let curTonePos =
+            vStart + getTonePosition(vs, terminated: vEnd == m_current)
         let tone = m_buffer[curTonePos].tone
 
         var newVs: VowelSequence = .none
@@ -627,32 +711,45 @@ public class UkEngine {
             if info.roofPosition == -1 { return processAppend(ev) }
 
             let curCh = m_buffer[vStart + info.roofPosition].vnSym
-            if target != .nonVnChar && curCh != target { return processAppend(ev) }
+            if target != .nonVnChar && curCh != target {
+                return processAppend(ev)
+            }
 
-            let newCh = (curCh == .ar) ? .a : ((curCh == .er) ? .e : .o)
+            let newCh: VnLexiName =
+                (curCh == .ar) ? .a : ((curCh == .er) ? .e : .o)
             let changePos = vStart + info.roofPosition
 
-            if !ctrl.options.freeMarking && changePos != m_current { return processAppend(ev) }
+            if !ctrl.options.freeMarking && changePos != m_current {
+                return processAppend(ev)
+            }
 
             markChange(changePos)
             m_buffer[changePos].vnSym = newCh
 
             if info.length == 3 {
-                newVs = lookupVowelSeq(m_buffer[vStart].vnSym, m_buffer[vStart+1].vnSym, m_buffer[vStart+2].vnSym)
+                newVs = lookupVowelSeq(
+                    m_buffer[vStart].vnSym,
+                    m_buffer[vStart + 1].vnSym,
+                    m_buffer[vStart + 2].vnSym
+                )
             } else if info.length == 2 {
-                newVs = lookupVowelSeq(m_buffer[vStart].vnSym, m_buffer[vStart+1].vnSym)
+                newVs = lookupVowelSeq(
+                    m_buffer[vStart].vnSym,
+                    m_buffer[vStart + 1].vnSym
+                )
             } else {
                 newVs = lookupVowelSeq(m_buffer[vStart].vnSym)
             }
 
             if let pInfo = getVowelSeqInfo(newVs) {
                 for i in 0..<pInfo.length {
-                    m_buffer[vStart+i].vseq = pInfo.subsequences[i]
+                    m_buffer[vStart + i].vseq = pInfo.subsequences[i]
                 }
             }
 
             // Tone reposition
-            let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+            let newTonePos =
+                vStart + getTonePosition(newVs, terminated: vEnd == m_current)
             if curTonePos != newTonePos && tone != 0 {
                 markChange(newTonePos)
                 m_buffer[newTonePos].tone = tone
@@ -667,7 +764,9 @@ public class UkEngine {
         }
 
         // Add roof
-        if target != .nonVnChar && newInfo.vowels[newInfo.roofPosition] != target {
+        if target != .nonVnChar
+            && newInfo.vowels[newInfo.roofPosition] != target
+        {
             return processAppend(ev)
         }
 
@@ -690,21 +789,24 @@ public class UkEngine {
             changePos = vStart + newInfo.roofPosition
         }
 
-        if !ctrl.options.freeMarking && changePos != m_current { return processAppend(ev) }
+        if !ctrl.options.freeMarking && changePos != m_current {
+            return processAppend(ev)
+        }
 
         markChange(changePos)
         if doubleChangeUO {
             m_buffer[vStart].vnSym = .u
-            m_buffer[vStart+1].vnSym = .or
+            m_buffer[vStart + 1].vnSym = .or
         } else {
             m_buffer[changePos].vnSym = newInfo.vowels[newInfo.roofPosition]
         }
 
         for i in 0..<newInfo.length {
-            m_buffer[vStart+i].vseq = newInfo.subsequences[i]
+            m_buffer[vStart + i].vseq = newInfo.subsequences[i]
         }
 
-        let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+        let newTonePos =
+            vStart + getTonePosition(newVs, terminated: vEnd == m_current)
         if curTonePos != newTonePos && tone != 0 {
             markChange(newTonePos)
             m_buffer[newTonePos].tone = tone
@@ -727,7 +829,8 @@ public class UkEngine {
         let vStart = vEnd - (info.length - 1)
         let vowels = info.vowels
 
-        let curTonePos = vStart + getTonePosition(vs, terminated: vEnd == m_current)
+        let curTonePos =
+            vStart + getTonePosition(vs, terminated: vEnd == m_current)
         let tone = m_buffer[curTonePos].tone
 
         var newVs: VowelSequence = .none
@@ -741,57 +844,74 @@ public class UkEngine {
                 newVs = info.withHook
                 markChange(vStart)
                 m_buffer[vStart].vnSym = .uh
-            } else { // uh -> uo
-                newVs = lookupVowelSeq(.u, .o, info.length > 2 ? vowels[2] : .nonVnChar)
+            } else {  // uh -> uo
+                newVs = lookupVowelSeq(
+                    .u,
+                    .o,
+                    info.length > 2 ? vowels[2] : .nonVnChar
+                )
                 markChange(vStart)
                 m_buffer[vStart].vnSym = .u
-                m_buffer[vStart+1].vnSym = .o
+                m_buffer[vStart + 1].vnSym = .o
                 hookRemoved = true
                 toneRemoved = (m_buffer[vStart].tone != 0)
             }
 
         case UkKeyEvName.hook_o.rawValue:
             if vowels[1] == .o || vowels[1] == .or {
-                if vEnd == m_current && info.length == 2 && m_buffer[m_current].form == .cv &&
-                   m_buffer[m_current-2].cseq == .th {
+                if vEnd == m_current && info.length == 2
+                    && m_buffer[m_current].form == .cv
+                    && m_buffer[m_current - 2].cseq == .th
+                {
                     // o|o^ -> o+ (th+uo -> th+uo+)
                     newVs = info.withHook
-                    markChange(vStart+1)
-                    m_buffer[vStart+1].vnSym = .oh
+                    markChange(vStart + 1)
+                    m_buffer[vStart + 1].vnSym = .oh
                 } else {
-                    newVs = lookupVowelSeq(.uh, .oh, info.length > 2 ? vowels[2] : .nonVnChar)
+                    newVs = lookupVowelSeq(
+                        .uh,
+                        .oh,
+                        info.length > 2 ? vowels[2] : .nonVnChar
+                    )
                     if vowels[0] == .u {
                         markChange(vStart)
                         m_buffer[vStart].vnSym = .uh
-                        m_buffer[vStart+1].vnSym = .oh
+                        m_buffer[vStart + 1].vnSym = .oh
                     } else {
-                        markChange(vStart+1)
-                        m_buffer[vStart+1].vnSym = .oh
+                        markChange(vStart + 1)
+                        m_buffer[vStart + 1].vnSym = .oh
                     }
                 }
-            } else { // oh -> uo
-                newVs = lookupVowelSeq(.u, .o, info.length > 2 ? vowels[2] : .nonVnChar)
+            } else {  // oh -> uo
+                newVs = lookupVowelSeq(
+                    .u,
+                    .o,
+                    info.length > 2 ? vowels[2] : .nonVnChar
+                )
                 if vowels[0] == .uh {
                     markChange(vStart)
                     m_buffer[vStart].vnSym = .u
-                    m_buffer[vStart+1].vnSym = .o
+                    m_buffer[vStart + 1].vnSym = .o
                 } else {
-                    markChange(vStart+1)
-                    m_buffer[vStart+1].vnSym = .o
+                    markChange(vStart + 1)
+                    m_buffer[vStart + 1].vnSym = .o
                 }
                 hookRemoved = true
-                toneRemoved = (m_buffer[vStart+1].tone != 0)
+                toneRemoved = (m_buffer[vStart + 1].tone != 0)
             }
 
-        default: // hookAll, hookUO
+        default:  // hookAll, hookUO
             if vowels[0] == .u {
                 if vowels[1] == .o || vowels[1] == .or {
                     // uo -> uo+ if th or h
-                    if (vs == .uo || vs == .uor) && vEnd == m_current && m_buffer[m_current].form == .cv &&
-                       (m_buffer[m_current-2].cseq == .th || m_buffer[m_current-2].cseq == .h) {
+                    if (vs == .uo || vs == .uor) && vEnd == m_current
+                        && m_buffer[m_current].form == .cv
+                        && (m_buffer[m_current - 2].cseq == .th
+                            || m_buffer[m_current - 2].cseq == .h)
+                    {
                         newVs = .uoh
-                        markChange(vStart+1)
-                        m_buffer[vStart+1].vnSym = .oh
+                        markChange(vStart + 1)
+                        m_buffer[vStart + 1].vnSym = .oh
                     } else {
                         // uo -> u+o+
                         newVs = info.withHook
@@ -799,36 +919,43 @@ public class UkEngine {
                         m_buffer[vStart].vnSym = .uh
                         if let tempInfo = getVowelSeqInfo(newVs) {
                             newVs = tempInfo.withHook
-                            m_buffer[vStart+1].vnSym = .oh
+                            m_buffer[vStart + 1].vnSym = .oh
                         }
                     }
-                } else { // uo+ -> u+o+
+                } else {  // uo+ -> u+o+
                     newVs = info.withHook
                     markChange(vStart)
                     m_buffer[vStart].vnSym = .uh
                 }
-            } else { // v[0] == uh
-                if vowels[1] == .o { // u+o -> u+o+
+            } else {  // v[0] == uh
+                if vowels[1] == .o {  // u+o -> u+o+
                     newVs = info.withHook
-                    markChange(vStart+1)
-                    m_buffer[vStart+1].vnSym = .oh
-                } else { // v[1] == oh, u+o+ -> uo
-                    newVs = lookupVowelSeq(.u, .o, info.length > 2 ? vowels[2] : .nonVnChar)
+                    markChange(vStart + 1)
+                    m_buffer[vStart + 1].vnSym = .oh
+                } else {  // v[1] == oh, u+o+ -> uo
+                    newVs = lookupVowelSeq(
+                        .u,
+                        .o,
+                        info.length > 2 ? vowels[2] : .nonVnChar
+                    )
                     markChange(vStart)
                     m_buffer[vStart].vnSym = .u
-                    m_buffer[vStart+1].vnSym = .o
+                    m_buffer[vStart + 1].vnSym = .o
                     hookRemoved = true
-                    toneRemoved = (m_buffer[vStart].tone != 0 || m_buffer[vStart+1].tone != 0)
+                    toneRemoved =
+                        (m_buffer[vStart].tone != 0
+                            || m_buffer[vStart + 1].tone != 0)
                 }
             }
         }
 
-        guard let p = getVowelSeqInfo(newVs) else { return 1 } // Should fail gracefully?
+        guard let p = getVowelSeqInfo(newVs) else { return 1 }  // Should fail gracefully?
         for i in 0..<p.length {
-            m_buffer[vStart+i].vseq = p.subsequences[i]
+            m_buffer[vStart + i].vseq = p.subsequences[i]
         }
 
-        let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+        let newTonePos =
+            vStart + getTonePosition(newVs, terminated: vEnd == m_current)
         if curTonePos != newTonePos && tone != 0 {
             markChange(newTonePos)
             m_buffer[newTonePos].tone = tone
@@ -846,7 +973,9 @@ public class UkEngine {
     }
 
     private func processHook(_ ev: UkKeyEvent) -> Int {
-        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0, m_buffer[m_current].vOffset >= 0 else {
+        guard let ctrl = m_pCtrl, ctrl.vietKey != 0, m_current >= 0,
+            m_buffer[m_current].vOffset >= 0
+        else {
             return processAppend(ev)
         }
 
@@ -856,13 +985,15 @@ public class UkEngine {
         let vStart = vEnd - (info.length - 1)
         let vowels = info.vowels
 
-        if info.length > 1 && ev.evType != UkKeyEvName.bowl.rawValue &&
-           (vowels[0] == .u || vowels[0] == .uh) &&
-           (vowels[1] == .o || vowels[1] == .oh || vowels[1] == .or) {
+        if info.length > 1 && ev.evType != UkKeyEvName.bowl.rawValue
+            && (vowels[0] == .u || vowels[0] == .uh)
+            && (vowels[1] == .o || vowels[1] == .oh || vowels[1] == .or)
+        {
             return processHookWithUO(ev)
         }
 
-        let curTonePos = vStart + getTonePosition(vs, terminated: vEnd == m_current)
+        let curTonePos =
+            vStart + getTonePosition(vs, terminated: vEnd == m_current)
         let tone = m_buffer[curTonePos].tone
 
         var newVs = info.withHook
@@ -873,18 +1004,27 @@ public class UkEngine {
             // Remove hook
             let curCh = m_buffer[vStart + info.hookPosition].vnSym
             var newCh: VnLexiName = .nonVnChar
-            if curCh == .ab { newCh = .a }
-            else if curCh == .uh { newCh = .u }
-            else { newCh = .o } // oh -> o
+            if curCh == .ab {
+                newCh = .a
+            } else if curCh == .uh {
+                newCh = .u
+            } else {
+                newCh = .o
+            }  // oh -> o
 
             let changePos = vStart + info.hookPosition
-            if !ctrl.options.freeMarking && changePos != m_current { return processAppend(ev) }
+            if !ctrl.options.freeMarking && changePos != m_current {
+                return processAppend(ev)
+            }
 
             // Check event type match
             switch ev.evType {
-            case UkKeyEvName.hook_u.rawValue: if curCh != .uh { return processAppend(ev) }
-            case UkKeyEvName.hook_o.rawValue: if curCh != .oh { return processAppend(ev) }
-            case UkKeyEvName.bowl.rawValue: if curCh != .ab { return processAppend(ev) }
+            case UkKeyEvName.hook_u.rawValue:
+                if curCh != .uh { return processAppend(ev) }
+            case UkKeyEvName.hook_o.rawValue:
+                if curCh != .oh { return processAppend(ev) }
+            case UkKeyEvName.bowl.rawValue:
+                if curCh != .ab { return processAppend(ev) }
             default: break
             }
 
@@ -892,20 +1032,28 @@ public class UkEngine {
             m_buffer[changePos].vnSym = newCh
 
             if info.length == 3 {
-                newVs = lookupVowelSeq(m_buffer[vStart].vnSym, m_buffer[vStart+1].vnSym, m_buffer[vStart+2].vnSym)
+                newVs = lookupVowelSeq(
+                    m_buffer[vStart].vnSym,
+                    m_buffer[vStart + 1].vnSym,
+                    m_buffer[vStart + 2].vnSym
+                )
             } else if info.length == 2 {
-                newVs = lookupVowelSeq(m_buffer[vStart].vnSym, m_buffer[vStart+1].vnSym)
+                newVs = lookupVowelSeq(
+                    m_buffer[vStart].vnSym,
+                    m_buffer[vStart + 1].vnSym
+                )
             } else {
                 newVs = lookupVowelSeq(m_buffer[vStart].vnSym)
             }
 
             if let pInfo = getVowelSeqInfo(newVs) {
                 for i in 0..<pInfo.length {
-                    m_buffer[vStart+i].vseq = pInfo.subsequences[i]
+                    m_buffer[vStart + i].vseq = pInfo.subsequences[i]
                 }
             }
 
-            let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+            let newTonePos =
+                vStart + getTonePosition(newVs, terminated: vEnd == m_current)
             if curTonePos != newTonePos && tone != 0 {
                 markChange(newTonePos)
                 m_buffer[newTonePos].tone = tone
@@ -918,12 +1066,23 @@ public class UkEngine {
             m_reverted = true
             return 1
         } else {
-            guard let newInfo = getVowelSeqInfo(newVs) else { return processAppend(ev) }
+            guard let newInfo = getVowelSeqInfo(newVs) else {
+                return processAppend(ev)
+            }
 
             switch ev.evType {
-            case UkKeyEvName.hook_u.rawValue: if newInfo.vowels[newInfo.hookPosition] != .uh { return processAppend(ev) }
-            case UkKeyEvName.hook_o.rawValue: if newInfo.vowels[newInfo.hookPosition] != .oh { return processAppend(ev) }
-            case UkKeyEvName.bowl.rawValue: if newInfo.vowels[newInfo.hookPosition] != .ab { return processAppend(ev) }
+            case UkKeyEvName.hook_u.rawValue:
+                if newInfo.vowels[newInfo.hookPosition] != .uh {
+                    return processAppend(ev)
+                }
+            case UkKeyEvName.hook_o.rawValue:
+                if newInfo.vowels[newInfo.hookPosition] != .oh {
+                    return processAppend(ev)
+                }
+            case UkKeyEvName.bowl.rawValue:
+                if newInfo.vowels[newInfo.hookPosition] != .ab {
+                    return processAppend(ev)
+                }
             default: break
             }
 
@@ -940,16 +1099,19 @@ public class UkEngine {
             if !isValidCVC(c1, newVs, c2) { return processAppend(ev) }
 
             let changePos = vStart + newInfo.hookPosition
-            if !ctrl.options.freeMarking && changePos != m_current { return processAppend(ev) }
+            if !ctrl.options.freeMarking && changePos != m_current {
+                return processAppend(ev)
+            }
 
             markChange(changePos)
             m_buffer[changePos].vnSym = newInfo.vowels[newInfo.hookPosition]
 
             for i in 0..<newInfo.length {
-                m_buffer[vStart+i].vseq = newInfo.subsequences[i]
+                m_buffer[vStart + i].vseq = newInfo.subsequences[i]
             }
 
-            let newTonePos = vStart + getTonePosition(newVs, terminated: vEnd == m_current)
+            let newTonePos =
+                vStart + getTonePosition(newVs, terminated: vEnd == m_current)
             if curTonePos != newTonePos && tone != 0 {
                 markChange(newTonePos)
                 m_buffer[newTonePos].tone = tone
@@ -967,8 +1129,10 @@ public class UkEngine {
         }
 
         // Allow dd in non-vn if preceding is not vowel
-        if m_buffer[m_current].form == .nonVn && m_buffer[m_current].vnSym == .d {
-            let prevSym = (m_current > 0) ? m_buffer[m_current-1].vnSym : .nonVnChar
+        if m_buffer[m_current].form == .nonVn && m_buffer[m_current].vnSym == .d
+        {
+            let prevSym =
+                (m_current > 0) ? m_buffer[m_current - 1].vnSym : .nonVnChar
             if prevSym == .nonVnChar || !prevSym.isVowel {
                 m_singleMode = true
                 markChange(m_current)
@@ -1013,7 +1177,9 @@ public class UkEngine {
     }
 
     private func processTelexW(_ ev: UkKeyEvent) -> Int {
-        guard let ctrl = m_pCtrl, ctrl.vietKey != 0 else { return processAppend(ev) }
+        guard let ctrl = m_pCtrl, ctrl.vietKey != 0 else {
+            return processAppend(ev)
+        }
 
         var newEv = ev
         newEv.evType = UkKeyEvName.hookAll.rawValue
@@ -1032,7 +1198,9 @@ public class UkEngine {
             }
             newEv.evType = UkKeyEvName.mapChar.rawValue
             newEv.chType = .vn
-            newEv.vnSym = Charset.isUpper(Character(UnicodeScalar(ev.keyCode) ?? "W")) ? .Uh : .uh
+            newEv.vnSym =
+                Charset.isUpper(Character(UnicodeScalar(ev.keyCode) ?? "W"))
+                ? .Uh : .uh
             return processMapChar(newEv)
         }
         return ret
@@ -1055,29 +1223,29 @@ public class UkEngine {
             m_singleMode = false
             return processWordEnd(ev)
         case .nonVn:
-             // ...
-             m_current += 1
-             var entry = WordInfo()
-             entry.form = (ev.chType == .wordBreak) ? .empty : .nonVn
-             entry.keyCode = ev.keyCode
-             entry.vnSym = ev.vnSym.toLower
-             entry.caps = (entry.vnSym != ev.vnSym)
-             m_buffer[m_current] = entry
-             markChange(m_current)
-             return 1
+            // ...
+            m_current += 1
+            var entry = WordInfo()
+            entry.form = (ev.chType == .wordBreak) ? .empty : .nonVn
+            entry.keyCode = ev.keyCode
+            entry.vnSym = ev.vnSym.toLower
+            entry.caps = (entry.vnSym != ev.vnSym)
+            m_buffer[m_current] = entry
+            markChange(m_current)
+            return 1
         case .vn:
-             if ev.vnSym.isVowel {
-                 // appendVowel...
-                 var lowerSym = ev.vnSym.toLower
-                 // In C++, StdVnNoTone check.
-                 // We need to normalize to base (remove tone from Input)
-                 // But wait, key input normally doesn't have tone except via mapChar?
-                 // InputMethod returns 'vnSym'.
+            if ev.vnSym.isVowel {
+                // appendVowel...
+                var lowerSym = ev.vnSym.toLower
+                // In C++, StdVnNoTone check.
+                // We need to normalize to base (remove tone from Input)
+                // But wait, key input normally doesn't have tone except via mapChar?
+                // InputMethod returns 'vnSym'.
 
-                 // Logic:
-                 return appendVowel(ev)
-             }
-             return appendConsonnant(ev)
+                // Logic:
+                return appendVowel(ev)
+            }
+            return appendConsonnant(ev)
         }
     }
 
@@ -1140,7 +1308,9 @@ public class UkEngine {
                 break
             }
 
-            let prevTonePos = (m_current - 1) - (vsInfo.length - 1) + getTonePosition(vs, terminated: true)
+            let prevTonePos =
+                (m_current - 1) - (vsInfo.length - 1)
+                + getTonePosition(vs, terminated: true)
             tone = m_buffer[prevTonePos].tone
 
             if lowerSym != canSym && tone != 0 {
@@ -1149,7 +1319,11 @@ public class UkEngine {
                 if vsInfo.length == 3 {
                     newVs = .none
                 } else if vsInfo.length == 2 {
-                    newVs = lookupVowelSeq(vsInfo.vowels[0], vsInfo.vowels[1], canSym)
+                    newVs = lookupVowelSeq(
+                        vsInfo.vowels[0],
+                        vsInfo.vowels[1],
+                        canSym
+                    )
                 } else {
                     newVs = lookupVowelSeq(vsInfo.vowels[0], canSym)
                 }
@@ -1184,7 +1358,9 @@ public class UkEngine {
             if tone == 0 {
                 if newTone != 0 {
                     tone = newTone
-                    let tonePos = getTonePosition(newVs, terminated: true) + ((m_current - 1) - vsInfo.length + 1)
+                    let tonePos =
+                        getTonePosition(newVs, terminated: true)
+                        + ((m_current - 1) - vsInfo.length + 1)
                     // Wait, logic in C++: tonePos = getTonePosition(...) + ...
                     // Correct.
                     // But we need buffer index.
@@ -1202,19 +1378,21 @@ public class UkEngine {
                     // The start index is the same.
 
                     markChange(tonePos)
-                    m_buffer[m_current] = entry // Save entry before accessing buffer potentially?
+                    m_buffer[m_current] = entry  // Save entry before accessing buffer potentially?
                     // No, tonePos is previous char usually.
                     // But wait, tonePos is calculated based on start.
                     // We must ensure buffer at tonePos is valid.
                     // If tonePos == m_current, we are setting tone on current.
                     // Yes.
 
-                    m_buffer[m_current] = entry // Commit current
+                    m_buffer[m_current] = entry  // Commit current
                     m_buffer[tonePos].tone = tone
                     return 1
                 }
             } else {
-                let newTonePos = getTonePosition(newVs, terminated: true) + ((m_current - 1) - vsInfo.length + 1)
+                let newTonePos =
+                    getTonePosition(newVs, terminated: true)
+                    + ((m_current - 1) - vsInfo.length + 1)
                 if newTonePos != prevTonePos {
                     markChange(prevTonePos)
                     m_buffer[prevTonePos].tone = 0
@@ -1334,7 +1512,7 @@ public class UkEngine {
                     markChange(m_current - 1)
                     m_buffer[m_current - 1].vnSym = .oh
                     m_buffer[m_current - 1].vseq = .uhoh
-                    prev.vseq = .uhoh // Update local copy if needed? No, reference `prev` is value copy in Swift struct?
+                    prev.vseq = .uhoh  // Update local copy if needed? No, reference `prev` is value copy in Swift struct?
                     // Swift structs are value types. `prev` is a copy.
                     // We must update m_buffer directly.
                     complexEvent = true
@@ -1360,11 +1538,17 @@ public class UkEngine {
                 entry.cseq = newCs
 
                 // Reposition tone
-                guard let vsInfo = getVowelSeqInfo(vs), let newVsInfo = getVowelSeqInfo(newVs) else { break }
+                guard let vsInfo = getVowelSeqInfo(vs),
+                    let newVsInfo = getVowelSeqInfo(newVs)
+                else { break }
 
-                let oldIdx = (m_current - 1) - (vsInfo.length - 1) + getTonePosition(vs, terminated: true)
+                let oldIdx =
+                    (m_current - 1) - (vsInfo.length - 1)
+                    + getTonePosition(vs, terminated: true)
                 if m_buffer[oldIdx].tone != 0 {
-                    let newIdx = (m_current - 1) - (newVsInfo.length - 1) + getTonePosition(newVs, terminated: false)
+                    let newIdx =
+                        (m_current - 1) - (newVsInfo.length - 1)
+                        + getTonePosition(newVs, terminated: false)
                     if newIdx != oldIdx {
                         markChange(newIdx)
                         m_buffer[newIdx].tone = m_buffer[oldIdx].tone
@@ -1399,7 +1583,11 @@ public class UkEngine {
             if csInfo.length == 3 {
                 newCs = .none
             } else if csInfo.length == 2 {
-                newCs = lookupConsonantSeq(csInfo.consonants[0], csInfo.consonants[1], lowerSym)
+                newCs = lookupConsonantSeq(
+                    csInfo.consonants[0],
+                    csInfo.consonants[1],
+                    lowerSym
+                )
             } else {
                 newCs = lookupConsonantSeq(csInfo.consonants[0], lowerSym)
             }
@@ -1453,22 +1641,24 @@ public class UkEngine {
     private func processNoSpellCheck(_ ev: UkKeyEvent) -> Int {
         var entry = m_buffer[m_current]
         if entry.vnSym.isVowel {
-             entry.form = .v
-             entry.vOffset = 0
-             entry.vseq = lookupVowelSeq(entry.vnSym)
-             entry.c1Offset = -1
-             entry.c2Offset = -1
+            entry.form = .v
+            entry.vOffset = 0
+            entry.vseq = lookupVowelSeq(entry.vnSym)
+            entry.c1Offset = -1
+            entry.c2Offset = -1
         } else {
-             entry.form = .c
-             entry.c1Offset = 0
-             entry.c2Offset = -1
-             entry.vOffset = -1
-             entry.cseq = lookupConsonantSeq(entry.vnSym)
+            entry.form = .c
+            entry.c1Offset = 0
+            entry.c2Offset = -1
+            entry.vOffset = -1
+            entry.cseq = lookupConsonantSeq(entry.vnSym)
         }
         m_buffer[m_current] = entry
 
-        if ev.evType == UkKeyEvName.normal.rawValue &&
-           ((entry.keyCode >= 65 && entry.keyCode <= 90) || (entry.keyCode >= 97 && entry.keyCode <= 122)) {
+        if ev.evType == UkKeyEvName.normal.rawValue
+            && ((entry.keyCode >= 65 && entry.keyCode <= 90)
+                || (entry.keyCode >= 97 && entry.keyCode <= 122))
+        {
             return 0
         }
 
@@ -1521,19 +1711,19 @@ public class UkEngine {
             var sym = info.vnSym
 
             if sym != .nonVnChar {
-                 if info.tone > 0 && sym.isVowel {
-                     sym = sym.withTone(info.tone)
-                 }
-                 if info.caps {
-                     sym = sym.toUpper
-                 }
+                if info.tone > 0 && sym.isVowel {
+                    sym = sym.withTone(info.tone)
+                }
+                if info.caps {
+                    sym = sym.toUpper
+                }
 
-                 // To Unicode
-                 if let u = vnLexiToUnicode[sym] {
-                     m_outBuf.append(contentsOf: u.utf16)
-                 } else {
-                     m_outBuf.append(UInt16(info.keyCode)) // Fallback
-                 }
+                // To Unicode
+                if let u = vnLexiToUnicode[sym] {
+                    m_outBuf.append(contentsOf: u.utf16)
+                } else {
+                    m_outBuf.append(UInt16(info.keyCode))  // Fallback
+                }
             } else {
                 m_outBuf.append(UInt16(info.keyCode))
             }
@@ -1546,18 +1736,20 @@ public class UkEngine {
         // Calculate length of output between first and last
         var len = 0
         for i in first...last {
-             let info = m_buffer[i]
-             if info.vnSym != .nonVnChar {
-                 var sym = info.vnSym
-                 if info.tone > 0 && sym.isVowel { sym = sym.withTone(info.tone) }
-                 if let u = vnLexiToUnicode[sym] {
-                     len += u.utf16.count
-                 } else {
-                     len += 1
-                 }
-             } else {
-                 len += 1
-             }
+            let info = m_buffer[i]
+            if info.vnSym != .nonVnChar {
+                var sym = info.vnSym
+                if info.tone > 0 && sym.isVowel {
+                    sym = sym.withTone(info.tone)
+                }
+                if let u = vnLexiToUnicode[sym] {
+                    len += u.utf16.count
+                } else {
+                    len += 1
+                }
+            } else {
+                len += 1
+            }
         }
         return len
     }
@@ -1581,7 +1773,7 @@ public class UkEngine {
 
         if info.length == 3 { return 1 }
 
-        if (m_pCtrl?.options.modernStyle ?? true) {
+        if m_pCtrl?.options.modernStyle ?? true {
             if vs == .oa || vs == .oe || vs == .uy { return 1 }
         }
 
@@ -1593,7 +1785,9 @@ public class UkEngine {
             m_keyCurrent -= 1
         }
         if m_current >= 0 && m_buffer[m_current].form == .empty {
-            while m_keyCurrent >= 0 && m_keyStrokes[m_keyCurrent].ev.chType != .wordBreak {
+            while m_keyCurrent >= 0
+                && m_keyStrokes[m_keyCurrent].ev.chType != .wordBreak
+            {
                 m_keyCurrent -= 1
             }
         }
@@ -1603,12 +1797,16 @@ public class UkEngine {
         if c == .none || v == .none { return true }
         guard let vInfo = getVowelSeqInfo(v) else { return true }
 
-        if (c == .gi && vInfo.vowels[0] == .i) || (c == .qu && vInfo.vowels[0] == .u) {
+        if (c == .gi && vInfo.vowels[0] == .i)
+            || (c == .qu && vInfo.vowels[0] == .u)
+        {
             return false
         }
 
         if c == .k {
-            let kVseq: [VowelSequence] = [.e, .i, .y, .er, .eo, .eu, .eru, .ia, .ie, .ier, .ieu, .ieru]
+            let kVseq: [VowelSequence] = [
+                .e, .i, .y, .er, .eo, .eu, .eru, .ia, .ie, .ier, .ieu, .ieru,
+            ]
             return kVseq.contains(v)
         }
         return true
@@ -1626,7 +1824,11 @@ public class UkEngine {
         return validVCPairs.contains(VCPair(v: v, c: c))
     }
 
-    private func isValidCVC(_ c1: ConsonantSequence, _ v: VowelSequence, _ c2: ConsonantSequence) -> Bool {
+    private func isValidCVC(
+        _ c1: ConsonantSequence,
+        _ v: VowelSequence,
+        _ c2: ConsonantSequence
+    ) -> Bool {
         if v == .none {
             return (c1 == .none || c2 != .none)
         }
@@ -1666,22 +1868,48 @@ public class UkEngine {
 
 // Unicode Table
 private let vnLexiToUnicode: [VnLexiName: String] = [
-    .A: "A", .a: "a", .A1: "\u{00C1}", .a1: "\u{00E1}", .A2: "\u{00C0}", .a2: "\u{00E0}", .A3: "\u{1EA2}", .a3: "\u{1EA3}", .A4: "\u{00C3}", .a4: "\u{00E3}", .A5: "\u{1EA0}", .a5: "\u{1EA1}",
-    .Ar: "\u{00C2}", .ar: "\u{00E2}", .Ar1: "\u{1EA4}", .ar1: "\u{1EA5}", .Ar2: "\u{1EA6}", .ar2: "\u{1EA7}", .Ar3: "\u{1EA8}", .ar3: "\u{1EA9}", .Ar4: "\u{1EAA}", .ar4: "\u{1EAB}", .Ar5: "\u{1EAC}", .ar5: "\u{1EAD}",
-    .Ab: "\u{0102}", .ab: "\u{0103}", .Ab1: "\u{1EAE}", .ab1: "\u{1EAF}", .Ab2: "\u{1EB0}", .ab2: "\u{1EB1}", .Ab3: "\u{1EB2}", .ab3: "\u{1EB3}", .Ab4: "\u{1EB4}", .ab4: "\u{1EB5}", .Ab5: "\u{1EB6}", .ab5: "\u{1EB7}",
-    .E: "E", .e: "e", .E1: "\u{00C9}", .e1: "\u{00E9}", .E2: "\u{00C8}", .e2: "\u{00E8}", .E3: "\u{1EBA}", .e3: "\u{1EBB}", .E4: "\u{1EBC}", .e4: "\u{1EBD}", .E5: "\u{1EB8}", .e5: "\u{1EB9}",
-    .Er: "\u{00CA}", .er: "\u{00EA}", .Er1: "\u{1EBE}", .er1: "\u{1EBF}", .Er2: "\u{1EC0}", .er2: "\u{1EC1}", .Er3: "\u{1EC2}", .er3: "\u{1EC3}", .Er4: "\u{1EC4}", .er4: "\u{1EC5}", .Er5: "\u{1EC6}", .er5: "\u{1EC7}",
-    .I: "I", .i: "i", .I1: "\u{00CD}", .i1: "\u{00ED}", .I2: "\u{00CC}", .i2: "\u{00EC}", .I3: "\u{1EC8}", .i3: "\u{1EC9}", .I4: "\u{0128}", .i4: "\u{0129}", .I5: "\u{1ECA}", .i5: "\u{1ECB}",
-    .O: "O", .o: "o", .O1: "\u{00D3}", .o1: "\u{00F3}", .O2: "\u{00D2}", .o2: "\u{00F2}", .O3: "\u{1ECE}", .o3: "\u{1ECF}", .O4: "\u{00D5}", .o4: "\u{00F5}", .O5: "\u{1ECC}", .o5: "\u{1ECD}",
-    .Or: "\u{00D4}", .or: "\u{00F4}", .Or1: "\u{1ED0}", .or1: "\u{1ED1}", .Or2: "\u{1ED2}", .or2: "\u{1ED3}", .Or3: "\u{1ED4}", .or3: "\u{1ED5}", .Or4: "\u{1ED6}", .or4: "\u{1ED7}", .Or5: "\u{1ED8}", .or5: "\u{1ED9}",
-    .Oh: "\u{01A0}", .oh: "\u{01A1}", .Oh1: "\u{1EDA}", .oh1: "\u{1EDB}", .Oh2: "\u{1EDC}", .oh2: "\u{1EDD}", .Oh3: "\u{1EDE}", .oh3: "\u{1EDF}", .Oh4: "\u{1EE0}", .oh4: "\u{1EE1}", .Oh5: "\u{1EE2}", .oh5: "\u{1EE3}",
-    .U: "U", .u: "u", .U1: "\u{00DA}", .u1: "\u{00FA}", .U2: "\u{00D9}", .u2: "\u{00F9}", .U3: "\u{1EE6}", .u3: "\u{1EE7}", .U4: "\u{0168}", .u4: "\u{0169}", .U5: "\u{1EE4}", .u5: "\u{1EE5}",
-    .Uh: "\u{01AF}", .uh: "\u{01B0}", .Uh1: "\u{1EE8}", .uh1: "\u{1EE9}", .Uh2: "\u{1EEA}", .uh2: "\u{1EEB}", .Uh3: "\u{1EEC}", .uh3: "\u{1EED}", .Uh4: "\u{1EEE}", .uh4: "\u{1EEF}", .Uh5: "\u{1EF0}", .uh5: "\u{1EF1}",
-    .Y: "Y", .y: "y", .Y1: "\u{00DD}", .y1: "\u{00FD}", .Y2: "\u{1EF2}", .y2: "\u{1EF3}", .Y3: "\u{1EF6}", .y3: "\u{1EF7}", .Y4: "\u{1EF8}", .y4: "\u{1EF9}", .Y5: "\u{1EF4}", .y5: "\u{1EF5}",
+    .A: "A", .a: "a", .A1: "\u{00C1}", .a1: "\u{00E1}", .A2: "\u{00C0}",
+    .a2: "\u{00E0}", .A3: "\u{1EA2}", .a3: "\u{1EA3}", .A4: "\u{00C3}",
+    .a4: "\u{00E3}", .A5: "\u{1EA0}", .a5: "\u{1EA1}",
+    .Ar: "\u{00C2}", .ar: "\u{00E2}", .Ar1: "\u{1EA4}", .ar1: "\u{1EA5}",
+    .Ar2: "\u{1EA6}", .ar2: "\u{1EA7}", .Ar3: "\u{1EA8}", .ar3: "\u{1EA9}",
+    .Ar4: "\u{1EAA}", .ar4: "\u{1EAB}", .Ar5: "\u{1EAC}", .ar5: "\u{1EAD}",
+    .Ab: "\u{0102}", .ab: "\u{0103}", .Ab1: "\u{1EAE}", .ab1: "\u{1EAF}",
+    .Ab2: "\u{1EB0}", .ab2: "\u{1EB1}", .Ab3: "\u{1EB2}", .ab3: "\u{1EB3}",
+    .Ab4: "\u{1EB4}", .ab4: "\u{1EB5}", .Ab5: "\u{1EB6}", .ab5: "\u{1EB7}",
+    .E: "E", .e: "e", .E1: "\u{00C9}", .e1: "\u{00E9}", .E2: "\u{00C8}",
+    .e2: "\u{00E8}", .E3: "\u{1EBA}", .e3: "\u{1EBB}", .E4: "\u{1EBC}",
+    .e4: "\u{1EBD}", .E5: "\u{1EB8}", .e5: "\u{1EB9}",
+    .Er: "\u{00CA}", .er: "\u{00EA}", .Er1: "\u{1EBE}", .er1: "\u{1EBF}",
+    .Er2: "\u{1EC0}", .er2: "\u{1EC1}", .Er3: "\u{1EC2}", .er3: "\u{1EC3}",
+    .Er4: "\u{1EC4}", .er4: "\u{1EC5}", .Er5: "\u{1EC6}", .er5: "\u{1EC7}",
+    .I: "I", .i: "i", .I1: "\u{00CD}", .i1: "\u{00ED}", .I2: "\u{00CC}",
+    .i2: "\u{00EC}", .I3: "\u{1EC8}", .i3: "\u{1EC9}", .I4: "\u{0128}",
+    .i4: "\u{0129}", .I5: "\u{1ECA}", .i5: "\u{1ECB}",
+    .O: "O", .o: "o", .O1: "\u{00D3}", .o1: "\u{00F3}", .O2: "\u{00D2}",
+    .o2: "\u{00F2}", .O3: "\u{1ECE}", .o3: "\u{1ECF}", .O4: "\u{00D5}",
+    .o4: "\u{00F5}", .O5: "\u{1ECC}", .o5: "\u{1ECD}",
+    .Or: "\u{00D4}", .or: "\u{00F4}", .Or1: "\u{1ED0}", .or1: "\u{1ED1}",
+    .Or2: "\u{1ED2}", .or2: "\u{1ED3}", .Or3: "\u{1ED4}", .or3: "\u{1ED5}",
+    .Or4: "\u{1ED6}", .or4: "\u{1ED7}", .Or5: "\u{1ED8}", .or5: "\u{1ED9}",
+    .Oh: "\u{01A0}", .oh: "\u{01A1}", .Oh1: "\u{1EDA}", .oh1: "\u{1EDB}",
+    .Oh2: "\u{1EDC}", .oh2: "\u{1EDD}", .Oh3: "\u{1EDE}", .oh3: "\u{1EDF}",
+    .Oh4: "\u{1EE0}", .oh4: "\u{1EE1}", .Oh5: "\u{1EE2}", .oh5: "\u{1EE3}",
+    .U: "U", .u: "u", .U1: "\u{00DA}", .u1: "\u{00FA}", .U2: "\u{00D9}",
+    .u2: "\u{00F9}", .U3: "\u{1EE6}", .u3: "\u{1EE7}", .U4: "\u{0168}",
+    .u4: "\u{0169}", .U5: "\u{1EE4}", .u5: "\u{1EE5}",
+    .Uh: "\u{01AF}", .uh: "\u{01B0}", .Uh1: "\u{1EE8}", .uh1: "\u{1EE9}",
+    .Uh2: "\u{1EEA}", .uh2: "\u{1EEB}", .Uh3: "\u{1EEC}", .uh3: "\u{1EED}",
+    .Uh4: "\u{1EEE}", .uh4: "\u{1EEF}", .Uh5: "\u{1EF0}", .uh5: "\u{1EF1}",
+    .Y: "Y", .y: "y", .Y1: "\u{00DD}", .y1: "\u{00FD}", .Y2: "\u{1EF2}",
+    .y2: "\u{1EF3}", .Y3: "\u{1EF6}", .y3: "\u{1EF7}", .Y4: "\u{1EF8}",
+    .y4: "\u{1EF9}", .Y5: "\u{1EF4}", .y5: "\u{1EF5}",
     .dd: "\u{0111}", .DD: "\u{0110}",
     .B: "B", .b: "b", .C: "C", .c: "c", .D: "D", .d: "d",
     .F: "F", .f: "f", .G: "G", .g: "g", .H: "H", .h: "h",
-    .J: "J", .j: "j", .K: "K", .k: "k", .L: "L", .l: "l", .M: "M", .m: "m", .N: "N", .n: "n",
-    .P: "P", .p: "p", .Q: "Q", .q: "q", .R: "R", .r: "r", .S: "S", .s: "s", .T: "T", .t: "t",
-    .V: "V", .v: "v", .W: "W", .w: "w", .X: "X", .x: "x", .Z: "Z", .z: "z"
+    .J: "J", .j: "j", .K: "K", .k: "k", .L: "L", .l: "l", .M: "M", .m: "m",
+    .N: "N", .n: "n",
+    .P: "P", .p: "p", .Q: "Q", .q: "q", .R: "R", .r: "r", .S: "S", .s: "s",
+    .T: "T", .t: "t",
+    .V: "V", .v: "v", .W: "W", .w: "w", .X: "X", .x: "x", .Z: "Z", .z: "z",
 ]

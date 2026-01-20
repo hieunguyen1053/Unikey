@@ -19,7 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   var eventTap: UniKeyEventTap?
 
   /// Current input method (Telex/VNI/VIQR)
-  var currentInputMethod: InputMethod = .telex
+  var currentInputMethod: UkInputMethod = .telex
 
   /// Whether Vietnamese mode is enabled
   var vietnameseEnabled: Bool = true

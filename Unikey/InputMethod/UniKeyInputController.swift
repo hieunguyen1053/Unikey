@@ -14,6 +14,9 @@ public class UniKeyInputController: IMKInputController {
 
   /// The Unikey engine instance
   private let engine = UkEngine()
+  
+  /// Shared memory for engine state
+  private let sharedMem = UkSharedMem()
 
   /// Whether we're in Vietnamese mode
   private var vietnameseMode: Bool = true
@@ -26,8 +29,11 @@ public class UniKeyInputController: IMKInputController {
   public override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
     super.init(server: server, delegate: delegate, client: inputClient)
 
+    // Initialize engine
+    engine.setCtrlInfo(sharedMem)
+
     // Default to Telex input method
-    engine.setInputMethod(.telex)
+    sharedMem.input.setIM(.telex)
     log("UniKeyInputController initialized with Telex")
   }
 
@@ -85,7 +91,9 @@ public class UniKeyInputController: IMKInputController {
     // Handle backspace
     if keyCode == 51 {  // Backspace key code
       log("Backspace pressed")
-      _ = engine.processBackspace()
+      if processBackspace(client: client) {
+          return true
+      }
       return false  // Let system handle backspace
     }
 
@@ -112,39 +120,66 @@ public class UniKeyInputController: IMKInputController {
     // Process through engine
     return processCharacter(char, keyCode: UInt32(keyCode), client: client)
   }
+  
+  /// Process backspace through engine
+  private func processBackspace(client: IMKTextInput) -> Bool {
+      var backs: Int = 0
+      var outBuf: [UInt16] = []
+      var outSize: Int = 0
+      var outType: UkOutputType = .normal
+      
+      let ret = engine.processBackspace(&backs, &outBuf, &outSize, &outType)
+      
+      if ret != 0 {
+          let output = String(utf16CodeUnits: outBuf, count: outSize)
+          applyChanges(client: client, backspaceCount: backs, output: output)
+          return true
+      }
+      return false
+  }
 
   /// Process a character through the Unikey engine
   private func processCharacter(_ char: Character, keyCode: UInt32, client: IMKTextInput) -> Bool {
     log("Processing character: '\(char)' keyCode: \(keyCode)")
 
-    let result = engine.process(keyCode: keyCode, char: char)
+    var backs: Int = 0
+    var outBuf: [UInt16] = []
+    var outSize: Int = 0
+    var outType: UkOutputType = .normal
+    
+    let ret = engine.process(keyCode, &backs, &outBuf, &outSize, &outType)
+    
+    let output = String(utf16CodeUnits: outBuf, count: outSize)
 
     log(
-      "Engine result - handled: \(result.handled), backspaces: \(result.backspaceCount), output: '\(result.output)'"
+      "Engine result - handled: \(ret != 0), backspaces: \(backs), output: '\(output)'"
     )
 
-    if result.handled {
+    if ret != 0 {
+      applyChanges(client: client, backspaceCount: backs, output: output)
+      return true
+    }
+
+    log("Not handled by engine, returning false")
+    return false
+  }
+  
+  private func applyChanges(client: IMKTextInput, backspaceCount: Int, output: String) {
       // If we need to replace characters (backspace then insert)
-      if result.backspaceCount > 0 {
+      if backspaceCount > 0 {
         // Delete previous characters
-        for _ in 0..<result.backspaceCount {
+        for _ in 0..<backspaceCount {
           // Send backspace to delete previous character
           sendBackspace(client: client)
         }
       }
 
       // Insert new text directly
-      if !result.output.isEmpty {
-        log("Inserting text: '\(result.output)'")
+      if !output.isEmpty {
+        log("Inserting text: '\(output)'")
         client.insertText(
-          result.output as NSString, replacementRange: NSRange(location: NSNotFound, length: 0))
+          output as NSString, replacementRange: NSRange(location: NSNotFound, length: 0))
       }
-
-      return true
-    }
-
-    log("Not handled by engine, returning false")
-    return false
   }
 
   /// Send a backspace key event
@@ -194,21 +229,21 @@ public class UniKeyInputController: IMKInputController {
 
   /// Switch to Telex input method
   @objc public func switchToTelex() {
-    engine.setInputMethod(.telex)
+    sharedMem.input.setIM(.telex)
     engine.reset()
     log("Switched to Telex")
   }
 
   /// Switch to VNI input method
   @objc public func switchToVNI() {
-    engine.setInputMethod(.vni)
+    sharedMem.input.setIM(.vni)
     engine.reset()
     log("Switched to VNI")
   }
 
   /// Switch to VIQR input method
   @objc public func switchToVIQR() {
-    engine.setInputMethod(.viqr)
+    sharedMem.input.setIM(.viqr)
     engine.reset()
     log("Switched to VIQR")
   }
