@@ -15,8 +15,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   /// Status bar item for menu
   var statusItem: NSStatusItem?
 
-  /// Event tap manager
-  var eventTap: UniKeyEventTap?
+  /// Event tap manager (new EventTapHandling module)
+  var eventTap: UnikeyEventTapManager?
 
   /// Current input method (Telex/VNI/VIQR)
   var currentInputMethod: UkInputMethod = .telex
@@ -54,8 +54,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   // MARK: - Event Tap Setup
 
   private func setupEventTap() {
-    eventTap = UniKeyEventTap()
-    eventTap?.debugLogCallback = { msg in
+    eventTap = UnikeyEventTapManager()
+    eventTap?.debugLogCallback = { [weak self] msg in
       NSLog("Unikey: \(msg)")
     }
     eventTap?.setInputMethod(currentInputMethod)
