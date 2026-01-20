@@ -6,9 +6,37 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		A05C45A52F1F86730043A37C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A05C44A82F1F386F0043A37C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A05C44AF2F1F386F0043A37C;
+			remoteInfo = Unikey;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		A05C44B02F1F386F0043A37C /* Unikey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Unikey.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A05C45A12F1F86730043A37C /* UnikeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UnikeyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A05C45B22F1F87700043A37C /* Exceptions for "UnikeyTests" folder in "Unikey" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				EngineTests.swift,
+			);
+			target = A05C44AF2F1F386F0043A37C /* Unikey */;
+		};
+		A05C45B32F1F87700043A37C /* Exceptions for "UnikeyTests" folder in "UnikeyTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				EngineTests.swift,
+			);
+			target = A05C45A02F1F86730043A37C /* UnikeyTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A05C44B22F1F386F0043A37C /* Unikey */ = {
@@ -16,10 +44,26 @@
 			path = Unikey;
 			sourceTree = "<group>";
 		};
+		A05C459A2F1F85A30043A37C /* UnikeyTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A05C45B22F1F87700043A37C /* Exceptions for "UnikeyTests" folder in "Unikey" target */,
+				A05C45B32F1F87700043A37C /* Exceptions for "UnikeyTests" folder in "UnikeyTests" target */,
+			);
+			path = UnikeyTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A05C44AD2F1F386F0043A37C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A05C459E2F1F86730043A37C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -34,6 +78,7 @@
 			children = (
 				A05C44B22F1F386F0043A37C /* Unikey */,
 				A05C44B12F1F386F0043A37C /* Products */,
+				A05C459A2F1F85A30043A37C /* UnikeyTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -41,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				A05C44B02F1F386F0043A37C /* Unikey.app */,
+				A05C45A12F1F86730043A37C /* UnikeyTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -62,6 +108,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				A05C44B22F1F386F0043A37C /* Unikey */,
+				A05C459A2F1F85A30043A37C /* UnikeyTests */,
 			);
 			name = Unikey;
 			packageProductDependencies = (
@@ -69,6 +116,26 @@
 			productName = Unikey;
 			productReference = A05C44B02F1F386F0043A37C /* Unikey.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A05C45A02F1F86730043A37C /* UnikeyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A05C45A72F1F86730043A37C /* Build configuration list for PBXNativeTarget "UnikeyTests" */;
+			buildPhases = (
+				A05C459D2F1F86730043A37C /* Sources */,
+				A05C459E2F1F86730043A37C /* Frameworks */,
+				A05C459F2F1F86730043A37C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A05C45A62F1F86730043A37C /* PBXTargetDependency */,
+			);
+			name = UnikeyTests;
+			packageProductDependencies = (
+			);
+			productName = UnikeyTests;
+			productReference = A05C45A12F1F86730043A37C /* UnikeyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -82,6 +149,11 @@
 				TargetAttributes = {
 					A05C44AF2F1F386F0043A37C = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					A05C45A02F1F86730043A37C = {
+						CreatedOnToolsVersion = 26.2;
+						LastSwiftMigration = 2620;
+						TestTargetID = A05C44AF2F1F386F0043A37C;
 					};
 				};
 			};
@@ -100,12 +172,20 @@
 			projectRoot = "";
 			targets = (
 				A05C44AF2F1F386F0043A37C /* Unikey */,
+				A05C45A02F1F86730043A37C /* UnikeyTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A05C44AE2F1F386F0043A37C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A05C459F2F1F86730043A37C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +202,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A05C459D2F1F86730043A37C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A05C45A62F1F86730043A37C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A05C44AF2F1F386F0043A37C /* Unikey */;
+			targetProxy = A05C45A52F1F86730043A37C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A05C44BA2F1F38720043A37C /* Debug */ = {
@@ -251,9 +346,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "$(SRCROOT)/Unikey/Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainNibFile = MainMenu;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -282,9 +378,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "$(SRCROOT)/Unikey/Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainNibFile = MainMenu;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -305,6 +402,47 @@
 			};
 			name = Release;
 		};
+		A05C45A82F1F86730043A37C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hieunguyen.UnikeyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Unikey.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Unikey";
+			};
+			name = Debug;
+		};
+		A05C45A92F1F86730043A37C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hieunguyen.UnikeyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Unikey.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Unikey";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -322,6 +460,15 @@
 			buildConfigurations = (
 				A05C44BD2F1F38720043A37C /* Debug */,
 				A05C44BE2F1F38720043A37C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A05C45A72F1F86730043A37C /* Build configuration list for PBXNativeTarget "UnikeyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A05C45A82F1F86730043A37C /* Debug */,
+				A05C45A92F1F86730043A37C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

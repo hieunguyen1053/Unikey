@@ -91,9 +91,9 @@ class PreferencesWindowController: NSWindowController {
   // MARK: - Helper Methods
 
   /// Get current input method from preferences
-  static func currentInputMethod() -> InputMethod {
+  static func currentInputMethod() -> UkInputMethod {
     let index = UserDefaults.standard.integer(forKey: Keys.inputMethod)
-    return InputMethod(rawValue: index) ?? .telex
+    return UkInputMethod(rawValue: index) ?? .telex
   }
 
   /// Check if free marking is enabled

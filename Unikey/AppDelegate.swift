@@ -2,14 +2,10 @@
 //  AppDelegate.swift
 //  Unikey - Vietnamese Input Method for macOS
 //
-//  Created by Hiếu Nguyễn on 20/1/26.
+//  Uses CGEventTap approach for reliable keyboard handling
 //
 
 import Cocoa
-import InputMethodKit
-
-/// Global IMK Server instance
-var server: IMKServer?
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -19,8 +15,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   /// Status bar item for menu
   var statusItem: NSStatusItem?
 
+  /// Event tap manager (new EventTapHandling module)
+  var eventTap: UnikeyEventTapManager?
+
   /// Current input method (Telex/VNI/VIQR)
-  var currentInputMethod: InputMethod = .telex
+  var currentInputMethod: UkInputMethod = .telex
 
   /// Whether Vietnamese mode is enabled
   var vietnameseEnabled: Bool = true
@@ -28,29 +27,68 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   // MARK: - Application Lifecycle
 
   func applicationDidFinishLaunching(_ aNotification: Notification) {
-    // Initialize IMK Server
-    let connectionName =
-      Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String ?? "Unikey_Connection"
-    let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.unikey.inputmethod"
+    NSLog("Unikey: Starting...")
 
-    server = IMKServer(name: connectionName, bundleIdentifier: bundleIdentifier)
-
-    if server == nil {
-      NSLog("Unikey: Failed to create IMKServer")
-    } else {
-      NSLog("Unikey: IMKServer created successfully")
+    // Check and request accessibility permission
+    if !checkAccessibilityPermission() {
+      showAccessibilityDialog()
     }
+
+    // Setup event tap
+    setupEventTap()
 
     // Setup status bar
     setupStatusBar()
+
+    NSLog("Unikey: Ready!")
   }
 
   func applicationWillTerminate(_ aNotification: Notification) {
-    // Cleanup
+    eventTap?.stop()
   }
 
   func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
+  }
+
+  // MARK: - Event Tap Setup
+
+  private func setupEventTap() {
+    eventTap = UnikeyEventTapManager()
+    eventTap?.debugLogCallback = { [weak self] msg in
+      NSLog("Unikey: \(msg)")
+    }
+    eventTap?.setInputMethod(currentInputMethod)
+
+    do {
+      try eventTap?.start()
+      NSLog("Unikey: Event tap started successfully")
+    } catch {
+      NSLog("Unikey: Failed to start event tap: \(error)")
+    }
+  }
+
+  // MARK: - Accessibility Permission
+
+  private func checkAccessibilityPermission() -> Bool {
+    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
+    return AXIsProcessTrustedWithOptions(options as CFDictionary)
+  }
+
+  private func showAccessibilityDialog() {
+    let alert = NSAlert()
+    alert.messageText = "Accessibility Permission Required"
+    alert.informativeText =
+      "Unikey needs Accessibility permission to intercept keyboard events.\n\nPlease go to System Preferences → Security & Privacy → Privacy → Accessibility and add Unikey."
+    alert.alertStyle = .warning
+    alert.addButton(withTitle: "Open System Preferences")
+    alert.addButton(withTitle: "Later")
+
+    if alert.runModal() == .alertFirstButtonReturn {
+      let url = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+      NSWorkspace.shared.open(url)
+    }
   }
 
   // MARK: - Status Bar Setup
@@ -59,9 +97,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
     if let button = statusItem?.button {
-      button.title = "🇻🇳"
-      button.action = #selector(statusBarClicked)
-      button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+      button.title = vietnameseEnabled ? "🇻🇳" : "EN"
     }
 
     // Create menu
@@ -104,16 +140,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   // MARK: - Menu Actions
 
-  @objc func statusBarClicked() {
-    // Toggle Vietnamese mode on click
-    toggleVietnamese()
-  }
-
   @objc func toggleVietnamese() {
     vietnameseEnabled.toggle()
+    eventTap?.vietnameseEnabled = vietnameseEnabled
+    eventTap?.reset()
     updateStatusBarTitle()
 
-    // Update menu checkmark
     if let menu = statusItem?.menu, let vnItem = menu.items.first {
       vnItem.state = vietnameseEnabled ? .on : .off
     }
@@ -121,16 +153,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   @objc func selectTelex() {
     currentInputMethod = .telex
+    eventTap?.setInputMethod(.telex)
+    eventTap?.reset()
     updateInputMethodMenu()
   }
 
   @objc func selectVNI() {
     currentInputMethod = .vni
+    eventTap?.setInputMethod(.vni)
+    eventTap?.reset()
     updateInputMethodMenu()
   }
 
   @objc func selectVIQR() {
     currentInputMethod = .viqr
+    eventTap?.setInputMethod(.viqr)
+    eventTap?.reset()
     updateInputMethodMenu()
   }
 

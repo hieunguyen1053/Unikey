@@ -1,155 +1,147 @@
-// Unikey Swift Engine - Consonant Sequences
+// Unikey Swift Engine
 // Ported from x-unikey-1.0.4/src/ukengine/vnlexi.h
 // Copyright (C) 2000-2005 Pham Kim Long
-// Swift port by Gemini
+// Swift port by Jules
 
 import Foundation
 
-/// Vietnamese consonant sequences - all valid consonant combinations
-/// Examples: b, c, ch, d, đ, g, gh, gi, k, kh, l, m, n, ng, ngh, nh, etc.
 public enum ConsonantSequence: Int, CaseIterable {
-  case none = -1
+    case none = -1
 
-  case b = 0
-  case c
-  case ch
-  case d
-  case dd  // đ
-  case dz
-  case g
-  case gh
-  case gi
-  case gin  // special: gin (as in "gìn")
-  case k
-  case kh
-  case l
-  case m
-  case n
-  case ng
-  case ngh
-  case nh
-  case p
-  case ph
-  case q
-  case qu
-  case r
-  case s
-  case t
-  case th
-  case tr
-  case v
-  case x
+    case b, c, ch
+    case d, dd, dz
+    case g, gh, gi, gin
+    case h
+    case k, kh
+    case l
+    case m
+    case n, ng, ngh, nh
+    case p, ph
+    case q, qu
+    case r
+    case s
+    case t, th, tr
+    case v
+    case x
 }
 
-/// Information about a consonant sequence
 public struct ConsonantSeqInfo {
-  /// Number of consonants in sequence (1-3)
-  public let length: Int
+    public var length: Int
+    public var consonants: [VnLexiName]
+    public var suffix: Bool  // Can be a suffix
 
-  /// Component consonants (up to 3)
-  public let consonants: [VnLexiName]
-
-  /// Whether this can be a word suffix (ending consonant)
-  public let canBeSuffix: Bool
-
-  public init(length: Int, consonants: [VnLexiName], canBeSuffix: Bool) {
-    self.length = length
-    self.consonants = consonants
-    self.canBeSuffix = canBeSuffix
-  }
+    public init(length: Int, consonants: [VnLexiName], suffix: Bool = false) {
+        self.length = length
+        self.consonants = consonants
+        self.suffix = suffix
+    }
 }
 
-/// Consonant sequence information table (ported from ukengine.cpp CSeqList)
-public let consonantSeqList: [ConsonantSeqInfo] = [
-  // cs_b
-  ConsonantSeqInfo(length: 1, consonants: [.b], canBeSuffix: false),
-  // cs_c
-  ConsonantSeqInfo(length: 1, consonants: [.c], canBeSuffix: true),
-  // cs_ch
-  ConsonantSeqInfo(length: 2, consonants: [.c, .h], canBeSuffix: true),
-  // cs_d
-  ConsonantSeqInfo(length: 1, consonants: [.d], canBeSuffix: false),
-  // cs_dd (đ)
-  ConsonantSeqInfo(length: 1, consonants: [.dd], canBeSuffix: false),
-  // cs_dz
-  ConsonantSeqInfo(length: 2, consonants: [.d, .z], canBeSuffix: false),
-  // cs_g
-  ConsonantSeqInfo(length: 1, consonants: [.g], canBeSuffix: false),
-  // cs_gh
-  ConsonantSeqInfo(length: 2, consonants: [.g, .h], canBeSuffix: false),
-  // cs_gi
-  ConsonantSeqInfo(length: 2, consonants: [.g, .i], canBeSuffix: false),
-  // cs_gin
-  ConsonantSeqInfo(length: 3, consonants: [.g, .i, .n], canBeSuffix: false),
-  // cs_k
-  ConsonantSeqInfo(length: 1, consonants: [.k], canBeSuffix: false),
-  // cs_kh
-  ConsonantSeqInfo(length: 2, consonants: [.k, .h], canBeSuffix: false),
-  // cs_l
-  ConsonantSeqInfo(length: 1, consonants: [.l], canBeSuffix: false),
-  // cs_m
-  ConsonantSeqInfo(length: 1, consonants: [.m], canBeSuffix: true),
-  // cs_n
-  ConsonantSeqInfo(length: 1, consonants: [.n], canBeSuffix: true),
-  // cs_ng
-  ConsonantSeqInfo(length: 2, consonants: [.n, .g], canBeSuffix: true),
-  // cs_ngh
-  ConsonantSeqInfo(length: 3, consonants: [.n, .g, .h], canBeSuffix: false),
-  // cs_nh
-  ConsonantSeqInfo(length: 2, consonants: [.n, .h], canBeSuffix: true),
-  // cs_p
-  ConsonantSeqInfo(length: 1, consonants: [.p], canBeSuffix: true),
-  // cs_ph
-  ConsonantSeqInfo(length: 2, consonants: [.p, .h], canBeSuffix: false),
-  // cs_q
-  ConsonantSeqInfo(length: 1, consonants: [.q], canBeSuffix: false),
-  // cs_qu
-  ConsonantSeqInfo(length: 2, consonants: [.q, .u], canBeSuffix: false),
-  // cs_r
-  ConsonantSeqInfo(length: 1, consonants: [.r], canBeSuffix: false),
-  // cs_s
-  ConsonantSeqInfo(length: 1, consonants: [.s], canBeSuffix: false),
-  // cs_t
-  ConsonantSeqInfo(length: 1, consonants: [.t], canBeSuffix: true),
-  // cs_th
-  ConsonantSeqInfo(length: 2, consonants: [.t, .h], canBeSuffix: false),
-  // cs_tr
-  ConsonantSeqInfo(length: 2, consonants: [.t, .r], canBeSuffix: false),
-  // cs_v
-  ConsonantSeqInfo(length: 1, consonants: [.v], canBeSuffix: false),
-  // cs_x
-  ConsonantSeqInfo(length: 1, consonants: [.x], canBeSuffix: false),
+// Lookup table (simulated)
+private let consonantSeqTable: [ConsonantSequence: ConsonantSeqInfo] = [
+    .b: ConsonantSeqInfo(length: 1, consonants: [.b], suffix: false),
+    .c: ConsonantSeqInfo(length: 1, consonants: [.c], suffix: true),
+    .ch: ConsonantSeqInfo(length: 2, consonants: [.c, .h], suffix: true),
+    .d: ConsonantSeqInfo(length: 1, consonants: [.d], suffix: false),
+    .dd: ConsonantSeqInfo(length: 1, consonants: [.dd], suffix: false),
+    .dz: ConsonantSeqInfo(length: 2, consonants: [.d, .z], suffix: false),
+    .g: ConsonantSeqInfo(length: 1, consonants: [.g], suffix: false),
+    .gh: ConsonantSeqInfo(length: 2, consonants: [.g, .h], suffix: false),
+    .gi: ConsonantSeqInfo(length: 2, consonants: [.g, .i], suffix: false),
+    .gin: ConsonantSeqInfo(length: 3, consonants: [.g, .i, .n], suffix: false),
+    .h: ConsonantSeqInfo(length: 1, consonants: [.h], suffix: false),
+    .k: ConsonantSeqInfo(length: 1, consonants: [.k], suffix: false),
+    .kh: ConsonantSeqInfo(length: 2, consonants: [.k, .h], suffix: false),
+    .l: ConsonantSeqInfo(length: 1, consonants: [.l], suffix: false),
+    .m: ConsonantSeqInfo(length: 1, consonants: [.m], suffix: true),
+    .n: ConsonantSeqInfo(length: 1, consonants: [.n], suffix: true),
+    .ng: ConsonantSeqInfo(length: 2, consonants: [.n, .g], suffix: true),
+    .ngh: ConsonantSeqInfo(length: 3, consonants: [.n, .g, .h], suffix: false),
+    .nh: ConsonantSeqInfo(length: 2, consonants: [.n, .h], suffix: true),
+    .p: ConsonantSeqInfo(length: 1, consonants: [.p], suffix: true),
+    .ph: ConsonantSeqInfo(length: 2, consonants: [.p, .h], suffix: false),
+    .q: ConsonantSeqInfo(length: 1, consonants: [.q], suffix: false),
+    .qu: ConsonantSeqInfo(length: 2, consonants: [.q, .u], suffix: false),
+    .r: ConsonantSeqInfo(length: 1, consonants: [.r], suffix: false),
+    .s: ConsonantSeqInfo(length: 1, consonants: [.s], suffix: false),
+    .t: ConsonantSeqInfo(length: 1, consonants: [.t], suffix: true),
+    .th: ConsonantSeqInfo(length: 2, consonants: [.t, .h], suffix: false),
+    .tr: ConsonantSeqInfo(length: 2, consonants: [.t, .r], suffix: false),
+    .v: ConsonantSeqInfo(length: 1, consonants: [.v], suffix: false),
+    .x: ConsonantSeqInfo(length: 1, consonants: [.x], suffix: false),
 ]
 
-// MARK: - Lookup Functions
+// Note: `consonantSeqList` in UkEngine.swift was used as array.
+// We should provide `consonantSeqList` as array indexable by enum rawValue if rawValue starts at 0.
+// Our enum starts at -1 (none) then 0, 1...
+// But Swift enums are safe.
+// We can expose a function or dictionary.
 
-/// Lookup consonant sequence from 1-3 consonants
-public func lookupConsonantSeq(
-  _ c1: VnLexiName, _ c2: VnLexiName = .nonVnChar, _ c3: VnLexiName = .nonVnChar
-) -> ConsonantSequence {
-  for (index, info) in consonantSeqList.enumerated() {
-    let matches: Bool
-    switch info.length {
-    case 1:
-      matches = info.consonants[0] == c1 && c2 == .nonVnChar && c3 == .nonVnChar
-    case 2:
-      matches = info.consonants[0] == c1 && info.consonants[1] == c2 && c3 == .nonVnChar
-    case 3:
-      matches = info.consonants[0] == c1 && info.consonants[1] == c2 && info.consonants[2] == c3
-    default:
-      matches = false
+public var consonantSeqList: [ConsonantSeqInfo] {
+    // Return array where index matches enum rawValue
+    // ConsonantSequence raw values are auto-incrementing from 0 (if none=-1 is manual).
+    // Wait, `case none = -1`, `case b` -> 0? No, `b` will be 0.
+    // Let's verify.
+    // Yes, Swift auto-increments from previous case.
+
+    var list = [ConsonantSeqInfo]()
+    // Iterate 0...max
+    // Or just map table.
+    // The previous code indexed into this list using `prev.cseq.rawValue`.
+    // So we need an array.
+
+    // Find max raw value
+    let maxRaw = ConsonantSequence.allCases.map { $0.rawValue }.max() ?? 0
+    // Fill array
+    for i in 0...maxRaw {
+        if let seq = ConsonantSequence(rawValue: i),
+            let info = consonantSeqTable[seq]
+        {
+            list.append(info)
+        } else {
+            // Should not happen if sparse
+            list.append(ConsonantSeqInfo(length: 0, consonants: []))
+        }
     }
-    if matches {
-      return ConsonantSequence(rawValue: index) ?? .none
-    }
-  }
-  return .none
+    return list
 }
 
-/// Get info for a consonant sequence
 public func getConsonantSeqInfo(_ seq: ConsonantSequence) -> ConsonantSeqInfo? {
-  guard seq != .none, seq.rawValue >= 0 && seq.rawValue < consonantSeqList.count else {
-    return nil
-  }
-  return consonantSeqList[seq.rawValue]
+    return consonantSeqTable[seq]
+}
+
+public func lookupConsonantSeq(
+    _ c1: VnLexiName,
+    _ c2: VnLexiName = .nonVnChar,
+    _ c3: VnLexiName = .nonVnChar
+) -> ConsonantSequence {
+    let b1 = c1.baseChar
+    let b2 = c2.baseChar
+    let b3 = c3.baseChar
+
+    if b1 == .nonVnChar { return .none }
+
+    if b2 == .nonVnChar {
+        // Single
+        for (seq, info) in consonantSeqTable where info.length == 1 {
+            if info.consonants[0] == b1 { return seq }
+        }
+    } else if b3 == .nonVnChar {
+        // Double
+        for (seq, info) in consonantSeqTable where info.length == 2 {
+            if info.consonants[0] == b1 && info.consonants[1] == b2 {
+                return seq
+            }
+        }
+    } else {
+        // Triple
+        for (seq, info) in consonantSeqTable where info.length == 3 {
+            if info.consonants[0] == b1 && info.consonants[1] == b2
+                && info.consonants[2] == b3
+            {
+                return seq
+            }
+        }
+    }
+    return .none
 }
