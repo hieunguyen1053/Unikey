@@ -16,6 +16,7 @@ public enum VnWordForm: Int {
 
 public enum UkOutputType: Int {
     case normal = 0
+    case keyOutput = 1
 }
 
 public struct UnikeyOptions {
@@ -393,19 +394,11 @@ public class UkEngine {
         return 1
     }
 
-    public func restoreKeyStrokes(
-        _ backs: inout Int,
-        _ outBuf: inout [UInt16],
-        _ outSize: inout Int,
-        _ outType: inout UkOutputType
-    ) -> Int {
-        outType = .normal  // UkKeyOutput in C++? C++ says UkKeyOutput but defines normal=0.
-        // Actually C++ sets outType = UkKeyOutput. I only have .normal.
-        // I should add .keyOutput to UkOutputType if needed, or just use normal.
+    private func restoreKeyStrokes() -> Int {
+        m_outType = .keyOutput
 
         if !lastWordHasVnMark() {
-            backs = 0
-            outSize = 0
+            m_backs = 0
             return 0
         }
 
@@ -424,8 +417,7 @@ public class UkEngine {
         keyStart += 1
 
         if !converted {
-            backs = 0
-            outSize = 0
+            m_backs = 0
             return 0
         }
 
@@ -433,7 +425,7 @@ public class UkEngine {
             m_current -= 1
         }
         markChange(m_current + 1)
-        backs = m_backs
+        // m_backs is updated by markChange
 
         m_outBuf = []
         m_keyRestoring = true
@@ -441,32 +433,17 @@ public class UkEngine {
         var ev = UkKeyEvent()
         if m_keyCurrent >= keyStart {
             for i in keyStart...m_keyCurrent {
-                // C++: outBuf[count++] = keyCode
-                // In Swift we append to m_outBuf? No, outBuf arg.
-                // But `restoreKeyStrokes` signature returns `outBuf`.
-                // We should append RAW keys to output.
                 m_outBuf.append(UInt16(m_keyStrokes[i].ev.keyCode))
 
-                guard let ctrl = m_pCtrl else { continue }
-                ctrl.input.keyCodeToSymbol(m_keyStrokes[i].ev.keyCode, &ev)
-                m_keyStrokes[i].converted = false
-                _ = processAppend(ev)
+                if let ctrl = m_pCtrl {
+                    ctrl.input.keyCodeToSymbol(m_keyStrokes[i].ev.keyCode, &ev)
+                    m_keyStrokes[i].converted = false
+                    _ = processAppend(ev)
+                }
             }
         }
 
         m_keyRestoring = false
-
-        // Output is raw keys, not processed string?
-        // C++: outBuf gets keyCodes.
-        // My implementation of process puts processed chars in m_outBuf.
-        // But here we want raw keys.
-        // `m_outBuf` was filled with raw keys above.
-        // Wait, `processAppend` inside loop might update `m_buffer` but we don't call `writeOutput`.
-        // Correct.
-
-        outBuf.append(contentsOf: m_outBuf)
-        outSize = m_outBuf.count
-
         return 1
     }
 
@@ -585,7 +562,12 @@ public class UkEngine {
             return 0
         }
 
-        // Restore logic...
+        if ctrl.options.autoNonVnRestore && lastWordIsNonVn() {
+            if restoreKeyStrokes() != 0 {
+                m_keyRestored = true
+                m_outputWritten = true
+            }
+        }
 
         m_current += 1
         var entry = WordInfo()
@@ -594,6 +576,11 @@ public class UkEngine {
         entry.vnSym = ev.vnSym.toLower
         entry.caps = (entry.vnSym != ev.vnSym)
         m_buffer[m_current] = entry
+
+        if m_keyRestored {
+            m_outBuf.append(UInt16(ev.keyCode))
+            return 1
+        }
 
         return 0
     }
