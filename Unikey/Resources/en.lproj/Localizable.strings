@@ -1,0 +1,69 @@
+/* English Localization for Unikey */
+
+// MARK: - Menu Items
+"menu.help" = "Help";
+"menu.tools" = "Tools...";
+"menu.quick_convert" = "Quick Convert";
+"menu.spell_check" = "Enable Spell Check";
+"menu.macro" = "Enable Macro";
+"menu.macro_editor" = "Edit Macro Table...";
+"menu.input_method" = "Input Method";
+"menu.other_charsets" = "Other Charsets...";
+"menu.preferences" = "Preferences...";
+"menu.quit" = "Quit";
+
+// MARK: - Character Sets
+"charset.unicode" = "Unicode (Precomposed)";
+"charset.tcvn3" = "TCVN3 (ABC)";
+"charset.vni" = "VNI Windows";
+
+// MARK: - Input Methods
+"input.telex" = "Telex";
+"input.vni" = "VNI";
+"input.viqr" = "VIQR";
+"input.microsoft" = "Microsoft VI Layout";
+
+// MARK: - Preferences Window
+"prefs.title" = "Unikey";
+
+// MARK: - Preferences: Controls Section
+"prefs.controls" = "Controls";
+"prefs.charset" = "Character Set:";
+"prefs.input_method" = "Input Method:";
+"prefs.switch_key" = "Switch Key:";
+
+// MARK: - Preferences: Other Options
+"prefs.other_options" = "Other Options";
+"prefs.free_marking" = "Free Marking";
+"prefs.modern_style" = "Modern style óa, úy (instead of òa, úy)";
+"prefs.clipboard_unicode" = "Always use clipboard for Unicode";
+"prefs.spell_check" = "Enable Spell Check";
+"prefs.auto_restore" = "Auto restore keys for invalid words";
+"prefs.show_notification" = "Show feedback notification";
+
+// MARK: - Preferences: Macro Options
+"prefs.macro_options" = "Macro Options";
+"prefs.enable_macro" = "Enable Macro";
+"prefs.macro_when_off" = "Enable Macro even when Vietnamese is off";
+"prefs.macro_table" = "Macro Table...";
+
+// MARK: - Preferences: System
+"prefs.system" = "System";
+"prefs.show_on_startup" = "Show this dialog on startup";
+"prefs.launch_at_login" = "Launch at Login";
+"prefs.language" = "Language";
+
+// MARK: - Preferences: Footer
+"prefs.help" = "Help";
+"prefs.about" = "About";
+"prefs.reset" = "Reset to Defaults";
+
+// MARK: - Languages
+"lang.vietnamese" = "Tiếng Việt";
+"lang.english" = "English";
+
+// MARK: - Accessibility
+"accessibility.title" = "Accessibility Permission Required";
+"accessibility.message" = "Unikey needs Accessibility permission to intercept keyboard events.\n\nPlease go to System Preferences → Security & Privacy → Privacy → Accessibility and add Unikey.";
+"accessibility.open_prefs" = "Open System Preferences";
+"accessibility.later" = "Later";

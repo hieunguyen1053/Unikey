@@ -1,0 +1,69 @@
+/* Vietnamese Localization for Unikey */
+
+// MARK: - Menu Items
+"menu.help" = "Hướng dẫn";
+"menu.tools" = "Công cụ...";
+"menu.quick_convert" = "Chuyển mã nhanh";
+"menu.spell_check" = "Bật kiểm tra chính tả";
+"menu.macro" = "Bật tính năng gõ tắt";
+"menu.macro_editor" = "Soạn bảng gõ tắt...";
+"menu.input_method" = "Kiểu gõ";
+"menu.other_charsets" = "Bảng mã khác...";
+"menu.preferences" = "Bảng điều khiển...";
+"menu.quit" = "Kết thúc";
+
+// MARK: - Character Sets
+"charset.unicode" = "Unicode dựng sẵn";
+"charset.tcvn3" = "TCVN3 (ABC)";
+"charset.vni" = "VNI Windows";
+
+// MARK: - Input Methods
+"input.telex" = "Telex";
+"input.vni" = "VNI";
+"input.viqr" = "VIQR";
+"input.microsoft" = "Microsoft VI Layout";
+
+// MARK: - Preferences Window
+"prefs.title" = "Unikey";
+
+// MARK: - Preferences: Controls Section
+"prefs.controls" = "Điều khiển";
+"prefs.charset" = "Bảng mã:";
+"prefs.input_method" = "Kiểu gõ:";
+"prefs.switch_key" = "Phím chuyển:";
+
+// MARK: - Preferences: Other Options
+"prefs.other_options" = "Tùy chọn khác";
+"prefs.free_marking" = "Cho phép gõ tự do";
+"prefs.modern_style" = "Đặt dấu oà, uý (thay vì òa, úy)";
+"prefs.clipboard_unicode" = "Luôn sử dụng clipboard cho Unicode";
+"prefs.spell_check" = "Bật kiểm tra chính tả";
+"prefs.auto_restore" = "Tự động khôi phục phím với từ sai";
+"prefs.show_notification" = "Hiện thông báo phản hồi";
+
+// MARK: - Preferences: Macro Options
+"prefs.macro_options" = "Tùy chọn gõ tắt";
+"prefs.enable_macro" = "Cho phép gõ tắt";
+"prefs.macro_when_off" = "Cho phép gõ tắt cả khi tắt tiếng Việt";
+"prefs.macro_table" = "Bảng gõ tắt...";
+
+// MARK: - Preferences: System
+"prefs.system" = "Hệ thống";
+"prefs.show_on_startup" = "Bật hội thoại này khi khởi động";
+"prefs.launch_at_login" = "Khởi động cùng macOS";
+"prefs.language" = "Ngôn ngữ";
+
+// MARK: - Preferences: Footer
+"prefs.help" = "Hướng dẫn";
+"prefs.about" = "Thông tin";
+"prefs.reset" = "Mặc định";
+
+// MARK: - Languages
+"lang.vietnamese" = "Tiếng Việt";
+"lang.english" = "English";
+
+// MARK: - Accessibility
+"accessibility.title" = "Cần quyền Accessibility";
+"accessibility.message" = "Unikey cần quyền Accessibility để xử lý sự kiện bàn phím.\n\nVui lòng vào System Preferences → Security & Privacy → Privacy → Accessibility và thêm Unikey.";
+"accessibility.open_prefs" = "Mở System Preferences";
+"accessibility.later" = "Để sau";
