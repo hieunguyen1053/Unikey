@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import SwiftUI
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -19,10 +20,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   var eventTap: UnikeyEventTapManager?
 
   /// Current input method (Telex/VNI/VIQR)
-  var currentInputMethod: UkInputMethod = .telex
+  @AppStorage("UniKeyInputMethod") var currentInputMethodIndex: Int = 0
+
+  /// Current character set
+  @AppStorage("UniKeyCharacterSet") var currentCharacterSetIndex: Int = 0
 
   /// Whether Vietnamese mode is enabled
   var vietnameseEnabled: Bool = true
+
+  /// Spell check enabled
+  @AppStorage("UniKeySpellCheck") var spellCheckEnabled: Bool = false
+
+  /// Macro enabled
+  @AppStorage("UniKeyMacroEnabled") var macroEnabled: Bool = true
+
+  // Input methods list
+  private let inputMethods: [(name: String, method: UkInputMethod)] = [
+    ("Telex", .telex),
+    ("VNI", .vni),
+    ("VIQR", .viqr),
+    ("Microsoft VI Layout", .telex),  // TODO: Add proper support
+  ]
+
+  // Character sets list
+  private let characterSets = [
+    "Unicode dựng sẵn",
+    "TCVN3 (ABC)",
+    "VNI Windows",
+  ]
 
   // MARK: - Application Lifecycle
 
@@ -55,10 +80,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func setupEventTap() {
     eventTap = UnikeyEventTapManager()
-    eventTap?.debugLogCallback = { [weak self] msg in
+    eventTap?.debugLogCallback = { msg in
       NSLog("Unikey: \(msg)")
     }
-    eventTap?.setInputMethod(currentInputMethod)
+
+    let method = inputMethods[safe: currentInputMethodIndex]?.method ?? .telex
+    eventTap?.setInputMethod(method)
 
     do {
       try eventTap?.start()
@@ -97,43 +124,85 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
     if let button = statusItem?.button {
-      button.title = vietnameseEnabled ? "🇻🇳" : "EN"
+      button.title = vietnameseEnabled ? "VI" : "EN"
     }
 
-    // Create menu
+    rebuildMenu()
+  }
+
+  private func rebuildMenu() {
     let menu = NSMenu()
 
-    // Vietnamese toggle
-    let vnItem = NSMenuItem(
-      title: "Vietnamese", action: #selector(toggleVietnamese), keyEquivalent: "")
-    vnItem.state = vietnameseEnabled ? .on : .off
-    menu.addItem(vnItem)
-
-    menu.addItem(NSMenuItem.separator())
-
-    // Input method selection
-    let telexItem = NSMenuItem(title: "Telex", action: #selector(selectTelex), keyEquivalent: "")
-    telexItem.state = currentInputMethod == .telex ? .on : .off
-    menu.addItem(telexItem)
-
-    let vniItem = NSMenuItem(title: "VNI", action: #selector(selectVNI), keyEquivalent: "")
-    vniItem.state = currentInputMethod == .vni ? .on : .off
-    menu.addItem(vniItem)
-
-    let viqrItem = NSMenuItem(title: "VIQR", action: #selector(selectVIQR), keyEquivalent: "")
-    viqrItem.state = currentInputMethod == .viqr ? .on : .off
-    menu.addItem(viqrItem)
-
-    menu.addItem(NSMenuItem.separator())
-
-    // Preferences
+    // MARK: - Hướng dẫn & Công cụ
+    menu.addItem(NSMenuItem(title: "Hướng dẫn", action: #selector(showHelp), keyEquivalent: ""))
     menu.addItem(
-      NSMenuItem(title: "Preferences...", action: #selector(showPreferences), keyEquivalent: ","))
-
-    // Quit
+      NSMenuItem(title: "Công cụ...", action: #selector(showTools), keyEquivalent: ""))
     menu.addItem(
       NSMenuItem(
-        title: "Quit Unikey", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        title: "Chuyển mã nhanh", action: #selector(quickConvert), keyEquivalent: ""))
+
+    menu.addItem(NSMenuItem.separator())
+
+    // MARK: - Bật kiểm tra chính tả
+    let spellCheckItem = NSMenuItem(
+      title: "Bật kiểm tra chính tả", action: #selector(toggleSpellCheck), keyEquivalent: "")
+    spellCheckItem.state = spellCheckEnabled ? .on : .off
+    menu.addItem(spellCheckItem)
+
+    // MARK: - Bật tính năng gõ tắt
+    let macroItem = NSMenuItem(
+      title: "Bật tính năng gõ tắt", action: #selector(toggleMacro), keyEquivalent: "")
+    macroItem.state = macroEnabled ? .on : .off
+    menu.addItem(macroItem)
+
+    // Soạn bảng gõ tắt
+    menu.addItem(
+      NSMenuItem(
+        title: "Soạn bảng gõ tắt...", action: #selector(showMacroEditor), keyEquivalent: ""))
+
+    // MARK: - Kiểu gõ (Input Method) - Submenu
+    let inputMethodItem = NSMenuItem(title: "Kiểu gõ", action: nil, keyEquivalent: "")
+    let inputMethodSubmenu = NSMenu()
+
+    for (index, im) in inputMethods.enumerated() {
+      let item = NSMenuItem(
+        title: im.name, action: #selector(selectInputMethod(_:)), keyEquivalent: "")
+      item.tag = index
+      item.state = (index == currentInputMethodIndex) ? .on : .off
+      inputMethodSubmenu.addItem(item)
+    }
+
+    inputMethodItem.submenu = inputMethodSubmenu
+    menu.addItem(inputMethodItem)
+
+    menu.addItem(NSMenuItem.separator())
+
+    // MARK: - Character Sets (Bảng mã)
+    for (index, charset) in characterSets.enumerated() {
+      let item = NSMenuItem(
+        title: charset, action: #selector(selectCharacterSet(_:)), keyEquivalent: "")
+      item.tag = index
+      item.state = (index == currentCharacterSetIndex) ? .on : .off
+      menu.addItem(item)
+    }
+
+    // Bảng mã khác
+    menu.addItem(
+      NSMenuItem(
+        title: "Bảng mã khác...", action: #selector(showOtherCharsets), keyEquivalent: ""))
+
+    menu.addItem(NSMenuItem.separator())
+
+    // MARK: - Bảng điều khiển (Preferences)
+    menu.addItem(
+      NSMenuItem(
+        title: "Bảng điều khiển...", action: #selector(showPreferences), keyEquivalent: ","))
+
+    // MARK: - Kết thúc (Quit)
+    menu.addItem(
+      NSMenuItem(
+        title: "Kết thúc", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"
+      ))
 
     statusItem?.menu = menu
   }
@@ -145,31 +214,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     eventTap?.vietnameseEnabled = vietnameseEnabled
     eventTap?.reset()
     updateStatusBarTitle()
+  }
 
-    if let menu = statusItem?.menu, let vnItem = menu.items.first {
-      vnItem.state = vietnameseEnabled ? .on : .off
+  @objc func toggleSpellCheck() {
+    spellCheckEnabled.toggle()
+    rebuildMenu()
+  }
+
+  @objc func toggleMacro() {
+    macroEnabled.toggle()
+    rebuildMenu()
+  }
+
+  @objc func selectInputMethod(_ sender: NSMenuItem) {
+    currentInputMethodIndex = sender.tag
+    let method = inputMethods[safe: currentInputMethodIndex]?.method ?? .telex
+    eventTap?.setInputMethod(method)
+    eventTap?.reset()
+    rebuildMenu()
+  }
+
+  @objc func selectCharacterSet(_ sender: NSMenuItem) {
+    currentCharacterSetIndex = sender.tag
+    rebuildMenu()
+  }
+
+  @objc func showHelp() {
+    if let url = URL(string: "https://www.unikey.org/huong-dan.html") {
+      NSWorkspace.shared.open(url)
     }
   }
 
-  @objc func selectTelex() {
-    currentInputMethod = .telex
-    eventTap?.setInputMethod(.telex)
-    eventTap?.reset()
-    updateInputMethodMenu()
+  @objc func showTools() {
+    // TODO: Implement tools window
+    NSLog("Unikey: Show tools")
   }
 
-  @objc func selectVNI() {
-    currentInputMethod = .vni
-    eventTap?.setInputMethod(.vni)
-    eventTap?.reset()
-    updateInputMethodMenu()
+  @objc func quickConvert() {
+    // TODO: Implement quick convert
+    NSLog("Unikey: Quick convert")
   }
 
-  @objc func selectVIQR() {
-    currentInputMethod = .viqr
-    eventTap?.setInputMethod(.viqr)
-    eventTap?.reset()
-    updateInputMethodMenu()
+  @objc func showMacroEditor() {
+    // TODO: Implement macro editor
+    NSLog("Unikey: Show macro editor")
+  }
+
+  @objc func showOtherCharsets() {
+    // TODO: Implement other charsets picker
+    NSLog("Unikey: Show other charsets")
   }
 
   @objc func showPreferences() {
@@ -178,24 +271,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func updateStatusBarTitle() {
     if let button = statusItem?.button {
-      button.title = vietnameseEnabled ? "🇻🇳" : "EN"
+      button.title = vietnameseEnabled ? "VI" : "EN"
     }
   }
+}
 
-  private func updateInputMethodMenu() {
-    guard let menu = statusItem?.menu else { return }
+// MARK: - Array Safe Subscript
 
-    for item in menu.items {
-      switch item.title {
-      case "Telex":
-        item.state = currentInputMethod == .telex ? .on : .off
-      case "VNI":
-        item.state = currentInputMethod == .vni ? .on : .off
-      case "VIQR":
-        item.state = currentInputMethod == .viqr ? .on : .off
-      default:
-        break
-      }
-    }
+extension Array {
+  subscript(safe index: Int) -> Element? {
+    return indices.contains(index) ? self[index] : nil
   }
 }
