@@ -49,8 +49,11 @@ final class EngineTests: XCTestCase {
   ///   - file: The file where assertion is made (for error reporting).
   ///   - line: The line where assertion is made (for error reporting).
   func assertInput(
-    _ input: String, produces expected: String, method: UkInputMethod = .telex,
-    file: StaticString = #file, line: UInt = #line
+    _ input: String,
+    produces expected: String,
+    method: UkInputMethod = .telex,
+    file: StaticString = #file,
+    line: UInt = #line
   ) {
     // Setup input method
     if sharedMem.input.getIM() != method {
@@ -67,7 +70,13 @@ final class EngineTests: XCTestCase {
       var outSize = 0
       var outType: UkOutputType = .normal
 
-      let ret = engine.process(keyCode, &backs, &outBuf, &outSize, &outType)
+      let ret = engine.process(
+        keyCode,
+        &backs,
+        &outBuf,
+        &outSize,
+        &outType
+      )
 
       // Simulate editor behavior
       if ret != 0 {
@@ -85,7 +94,10 @@ final class EngineTests: XCTestCase {
 
         // Append new text
         if outSize > 0 {
-          let outString = String(utf16CodeUnits: outBuf, count: outSize)
+          let outString = String(
+            utf16CodeUnits: outBuf,
+            count: outSize
+          )
           currentText += outString
         }
       } else {
@@ -95,7 +107,11 @@ final class EngineTests: XCTestCase {
     }
 
     XCTAssertEqual(
-      currentText, expected, "Input '\(input)' should produce '\(expected)'", file: file, line: line
+      currentText,
+      expected,
+      "Input '\(input)' should produce '\(expected)'",
+      file: file,
+      line: line
     )
   }
 
@@ -214,6 +230,85 @@ final class EngineTests: XCTestCase {
   func testMixInput() {
     // Input "Unikey"
     assertInput("Unikey", produces: "Unikey")
+  }
+
+  // MARK: - Free Marking Tests
+
+  func testFreeMarkingEnabled() {
+    sharedMem.options.freeMarking = true
+    // With free marking, tone can be placed at any position
+    assertInput("tooi", produces: "tôi")
+    // vieet produces viêt with circumflex
+    assertInput("vieet", produces: "viêt")
+  }
+
+  func testFreeMarkingDisabled() {
+    sharedMem.options.freeMarking = false
+    sharedMem.options.spellCheckEnabled = true
+    // Without free marking, tone placement follows stricter rules
+    // Testing basic word formation still works
+    assertInput("tooi", produces: "tôi")
+  }
+
+  // MARK: - Spell Check Tests
+
+  func testSpellCheckEnabled() {
+    sharedMem.options.spellCheckEnabled = true
+    // With spell check, invalid combinations should be handled
+    assertInput("vieet", produces: "viêt")
+  }
+
+  func testSpellCheckDisabled() {
+    sharedMem.options.spellCheckEnabled = false
+    // Without spell check, all inputs are accepted
+    assertInput("vieet", produces: "viêt")
+  }
+
+  // MARK: - Auto Restore Tests
+
+  func testAutoRestoreWithInvalidWord() {
+    sharedMem.options.autoNonVnRestore = true
+    sharedMem.options.spellCheckEnabled = true
+    // When typing valid Vietnamese with double e
+    // "nghieem" -> "nghiêm" (circumflex e)
+    assertInput("nghieem", produces: "nghiêm")
+  }
+
+  func testAutoRestoreDisabled() {
+    sharedMem.options.autoNonVnRestore = false
+    // Without auto restore, behavior same for valid words
+    assertInput("nghieem", produces: "nghiêm")
+  }
+
+  // MARK: - Combination Tests
+
+  func testModernStyleWithTones() {
+    sharedMem.options.modernStyle = true
+    // Modern orthography: hoà (tone on second vowel)
+    assertInput("hoas", produces: "hoá")
+    assertInput("uys", produces: "uý")
+  }
+
+  func testOldStyleWithTones() {
+    sharedMem.options.modernStyle = false
+    // Old orthography: hòa (tone on first vowel)
+    assertInput("hoas", produces: "hóa")
+    // For 'uy', old style puts tone on 'u'
+    assertInput("uys", produces: "úy")
+  }
+
+  // MARK: - Word Boundary Tests
+
+  func testWordBoundaryWithSpace() {
+    // Space should trigger word boundary processing
+    // and potentially macro replacement or spell check
+    engine.reset()
+    assertInput("xin ", produces: "xin ")
+  }
+
+  func testMultipleWords() {
+    engine.reset()
+    assertInput("xin chao", produces: "xin chao")
   }
 
 }

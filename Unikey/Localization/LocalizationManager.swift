@@ -249,7 +249,7 @@ extension String {
         case "charset.unicode": return L.charsetUnicode
         case "charset.tcvn3": return L.charsetTCVN3
         case "charset.vni": return L.charsetVNI
-        case "input.telex": return "Telex"  
+        case "input.telex": return "Telex"
         case "input.vni": return "VNI"
         case "input.viqr": return "VIQR"
         case "input.microsoft": return "Microsoft VI Layout"
