@@ -26,6 +26,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				EngineTests.swift,
+				PreferencesTests.swift,
 			);
 			target = A05C44AF2F1F386F0043A37C /* Unikey */;
 		};
@@ -33,6 +34,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				EngineTests.swift,
+				PreferencesTests.swift,
 			);
 			target = A05C45A02F1F86730043A37C /* UnikeyTests */;
 		};
