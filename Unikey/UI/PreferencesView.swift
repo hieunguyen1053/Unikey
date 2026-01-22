@@ -68,7 +68,7 @@ struct PreferencesView: View {
                             }
                             .labelsHidden()
                             .frame(maxWidth: .infinity)
-                            .onChange(of: inputMethodIndex) { _ in
+                            .onChange(of: inputMethodIndex) {
                                 NotificationCenter.default.post(
                                     name: .inputMethodChanged,
                                     object: nil
@@ -82,8 +82,8 @@ struct PreferencesView: View {
                                 .frame(width: 100, alignment: .trailing)
 
                             Picker("", selection: $switchKeyIndex) {
-                                Text("CTRL + SHIFT").tag(0)
-                                Text("ALT + Z").tag(1)
+                                Text("CMD + SHIFT").tag(0)
+                                Text("CMD + SHIFT + V").tag(1)
                             }
                             .pickerStyle(.radioGroup)
                             .horizontalRadioGroupLayout()
@@ -145,7 +145,9 @@ struct PreferencesView: View {
                                     isOn: $showDialogOnStartup
                                 )
                                 Toggle(L.launchAtLogin, isOn: $launchAtLogin)
-                                    .onChange(of: launchAtLogin) { newValue in
+                                    .onChange(of: launchAtLogin) {
+                                        _,
+                                        newValue in
                                         updateLaunchAtLogin(enabled: newValue)
                                     }
 
@@ -291,6 +293,7 @@ class PreferencesWindowManager {
                 backing: .buffered,
                 defer: false
             )
+            window?.isReleasedWhenClosed = false
             window?.title = "Unikey"
             window?.contentView = NSHostingView(rootView: preferencesView)
             window?.center()

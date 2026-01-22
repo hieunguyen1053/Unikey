@@ -272,9 +272,6 @@ struct MacroEditorView: View {
                     .lineLimit(2)
             }
         }
-        .onChange(of: sortOrder) { newOrder in
-            // Sort is handled automatically
-        }
         .contextMenu(forSelectionType: UUID.self) { selection in
             if selection.count == 1, let id = selection.first,
                 let macro = macroTable.macros.first(where: { $0.id == id })
@@ -597,6 +594,7 @@ class MacroEditorWindowController {
                 backing: .buffered,
                 defer: false
             )
+            window?.isReleasedWhenClosed = false
             window?.title =
                 LocalizationManager.shared.currentLanguage == .vietnamese
                 ? "Bảng gõ tắt - Unikey"

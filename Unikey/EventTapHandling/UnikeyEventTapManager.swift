@@ -16,6 +16,7 @@ public class UnikeyEventTapManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isEnabled = false
+    private var permissionTimer: Timer?
 
     private let unikey: UnikeyInterface
     private let processor: UnikeyKeyProcessor
@@ -23,6 +24,9 @@ public class UnikeyEventTapManager {
 
     /// Debug callback for logging
     public var debugLogCallback: ((String) -> Void)?
+
+    /// Callback when language is toggled via shortcut (passes new vietnameseEnabled state)
+    public var languageToggleCallback: ((Bool) -> Void)?
 
     // MARK: - Initialization
 
@@ -91,13 +95,21 @@ public class UnikeyEventTapManager {
         modernStyle: Bool,
         spellCheckEnabled: Bool,
         autoNonVnRestore: Bool,
-        macroEnabled: Bool
+        macroEnabled: Bool,
+        switchKeyType: Int
     ) {
         unikey.freeMarking = freeMarking
         unikey.modernStyle = modernStyle
         unikey.spellCheckEnabled = spellCheckEnabled
         unikey.autoNonVnRestore = autoNonVnRestore
         unikey.macroEnabled = macroEnabled
+
+        // Update processor switch key type
+        if let type = UnikeyKeyProcessor.UnikeySwitchKeyType(
+            rawValue: switchKeyType
+        ) {
+            processor.switchKeyType = type
+        }
     }
 
     // MARK: - Event Tap Lifecycle (mirrors initXIM and main loop)
@@ -109,7 +121,10 @@ public class UnikeyEventTapManager {
 
         // Check accessibility permission
         guard checkAccessibilityPermission() else {
-            debugLogCallback?("No accessibility permission")
+            debugLogCallback?(
+                "No accessibility permission, starting polling..."
+            )
+            startPermissionPolling()
             throw NSError(
                 domain: "UnikeyEventTapManager",
                 code: -1,
@@ -119,11 +134,16 @@ public class UnikeyEventTapManager {
                 ]
             )
         }
+        stopPermissionPolling()
         debugLogCallback?("Accessibility permission OK")
 
         // Create event mask for keyboard events
         // xim.c: filter_mask = KeyPressMask | KeyReleaseMask
-        let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
+        // Create event mask for keyboard events and flags changed
+        // xim.c: filter_mask = KeyPressMask | KeyReleaseMask
+        let eventMask: CGEventMask =
+            (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.flagsChanged.rawValue)
 
         // Event tap callback
         let callback: CGEventTapCallBack = { proxy, type, event, refcon in
@@ -147,13 +167,10 @@ public class UnikeyEventTapManager {
 
         let userInfo = Unmanaged.passUnretained(self).toOpaque()
 
-        // Create event tap
+        // Create event tap using helper
         guard
-            let tap = CGEvent.tapCreate(
-                tap: .cgSessionEventTap,
-                place: .headInsertEventTap,
-                options: .defaultTap,
-                eventsOfInterest: eventMask,
+            let tap = createEventTap(
+                eventMask: eventMask,
                 callback: callback,
                 userInfo: userInfo
             )
@@ -197,8 +214,46 @@ public class UnikeyEventTapManager {
         debugLogCallback?("Event tap started!")
     }
 
+    /// Helper to create event tap with HID fallback
+    private func createEventTap(
+        eventMask: CGEventMask,
+        callback: @escaping CGEventTapCallBack,
+        userInfo: UnsafeMutableRawPointer?
+    ) -> CFMachPort? {
+        // Try HID level first (better timing, avoids swallowing in terminals)
+        if let tap = CGEvent.tapCreate(
+            tap: .cghidEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: callback,
+            userInfo: userInfo
+        ) {
+            debugLogCallback?("Event tap created at HID level")
+            return tap
+        }
+
+        debugLogCallback?("HID tap failed, trying session level...")
+
+        // Fallback to session level
+        if let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: callback,
+            userInfo: userInfo
+        ) {
+            debugLogCallback?("Event tap created at session level")
+            return tap
+        }
+
+        return nil
+    }
+
     /// Stop the event tap
     public func stop() {
+        stopPermissionPolling()
         guard isEnabled else { return }
 
         if let tap = eventTap {
@@ -214,6 +269,29 @@ public class UnikeyEventTapManager {
 
         isEnabled = false
         debugLogCallback?("Event tap stopped")
+    }
+
+    // MARK: - Permission Polling
+
+    private func startPermissionPolling() {
+        guard permissionTimer == nil else { return }
+        permissionTimer = Timer.scheduledTimer(
+            withTimeInterval: 1.0,
+            repeats: true
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            if self.checkAccessibilityPermission() {
+                self.debugLogCallback?(
+                    "Permission granted! Starting event tap..."
+                )
+                try? self.start()
+            }
+        }
+    }
+
+    private func stopPermissionPolling() {
+        permissionTimer?.invalidate()
+        permissionTimer = nil
     }
 
     /// Reset the engine state
@@ -247,6 +325,70 @@ public class UnikeyEventTapManager {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
+        // Monitor flags changed for Cmd+Shift toggle
+        if type == .flagsChanged {
+            // Only process if switch type is Cmd+Shift
+            if processor.switchKeyType == .cmdShift {
+                let flags = event.flags
+                let code = event.keyCode
+
+                // Check if Cmd and Shift are pressed
+                let hasCmd = flags.contains(.maskCommand)
+                let hasShift = flags.contains(.maskShift)
+
+                // We toggle when both are pressed, or maybe when one is released after both were pressed.
+                // Common behavior: Toggle when the combination is detected.
+                // To avoid repeating toggles while holding, we might need state tracking.
+                // But for simplicity, let's try toggling when both are present.
+                // Optimization: Only toggle if NO other modifiers are pressed (except maybe caps/fn)
+
+                // Check for exact match (Cmd + Shift only)
+                // Ignorning AlphaShift (Caps), NumericPad, Help, NonCoalesced
+                let relevantFlags: CGEventFlags = [
+                    .maskCommand, .maskShift, .maskControl, .maskAlternate,
+                ]
+                let currentRelevant = flags.intersection(relevantFlags)
+
+                if currentRelevant == [.maskCommand, .maskShift] {
+                    // Check if this is the "press" event (flags changed includes press and release)
+                    // If we just detected the combo, toggle.
+                    // But flagsChanged fires for each key.
+                    // 1. Press Cmd -> flags has Cmd
+                    // 2. Press Shift -> flags has Cmd+Shift -> Toggle!
+                    // 3. Release Shift -> flags has Cmd
+                    // 4. Release Cmd -> flags empty
+
+                    // Issue: If user holds Cmd+Shift, auto-repeat doesn't trigger flagsChanged usually.
+                    // But if they press Cmd, then Shift, it toggles.
+                    // If they press Shift, then Cmd, it toggles.
+
+                    // We need to debounce or ensure we don't toggle repeatedly if valid?
+                    // Actually, Windows switcher usually toggles on RELEASE or invalid key?
+                    // macOS input source switcher (Cmd+Space) toggles immediately.
+                    // Let's toggle immediately.
+
+                    // To prevent double toggle if they press unrelated keys? No, flagsChanged only fires on modifier keys.
+                    // But we should track state to only toggle once per press sequence?
+                    // For now, let's keep it simple: Toggle.
+
+                    unikey.vietnameseEnabled.toggle()
+                    unikey.resetBuf()
+
+                    // Notify AppDelegate to update UI
+                    languageToggleCallback?(unikey.vietnameseEnabled)
+
+                    // Debug log
+                    debugLogCallback?(
+                        "Toggle via Cmd+Shift: \(unikey.vietnameseEnabled ? "VI" : "EN")"
+                    )
+
+                    // We generally don't consume flagsChanged events as they affect system state
+                    return Unmanaged.passUnretained(event)
+                }
             }
             return Unmanaged.passUnretained(event)
         }
