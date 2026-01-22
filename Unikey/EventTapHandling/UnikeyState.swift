@@ -29,8 +29,22 @@ public class UnikeyState {
     /// UkTriggering - currently processing a trigger key
     public var ukTriggering: Bool = false
 
+    private var _vietnameseEnabled: Bool = true
+    private let lock = NSLock()
+
     /// Vietnamese mode enabled (GlobalOpt.enabled)
-    public var vietnameseEnabled: Bool = true
+    public var vietnameseEnabled: Bool {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _vietnameseEnabled
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            _vietnameseEnabled = newValue
+        }
+    }
 
     // MARK: - Caps State (xim.c: UnikeyCapsLockOn, UnikeyShiftPressed)
 

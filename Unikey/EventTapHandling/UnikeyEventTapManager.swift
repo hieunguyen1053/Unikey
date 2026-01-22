@@ -18,6 +18,13 @@ public class UnikeyEventTapManager {
     private var isEnabled = false
     private var permissionTimer: Timer?
 
+    // State for modifier-only shortcuts
+    private struct ModifierState {
+        var cmdShiftPressed = false
+        var interrupted = false
+    }
+    private var modifierState = ModifierState()
+
     private let unikey: UnikeyInterface
     private let processor: UnikeyKeyProcessor
     private let committer: UnikeyTextCommitter
@@ -275,8 +282,9 @@ public class UnikeyEventTapManager {
 
     private func startPermissionPolling() {
         guard permissionTimer == nil else { return }
+        // Poll every 2.0s to check for permission change (non-blocking)
         permissionTimer = Timer.scheduledTimer(
-            withTimeInterval: 1.0,
+            withTimeInterval: 2.0,
             repeats: true
         ) { [weak self] _ in
             guard let self = self else { return }
@@ -334,60 +342,42 @@ public class UnikeyEventTapManager {
             // Only process if switch type is Cmd+Shift
             if processor.switchKeyType == .cmdShift {
                 let flags = event.flags
-                let code = event.keyCode
-
-                // Check if Cmd and Shift are pressed
-                let hasCmd = flags.contains(.maskCommand)
-                let hasShift = flags.contains(.maskShift)
-
-                // We toggle when both are pressed, or maybe when one is released after both were pressed.
-                // Common behavior: Toggle when the combination is detected.
-                // To avoid repeating toggles while holding, we might need state tracking.
-                // But for simplicity, let's try toggling when both are present.
-                // Optimization: Only toggle if NO other modifiers are pressed (except maybe caps/fn)
-
-                // Check for exact match (Cmd + Shift only)
-                // Ignorning AlphaShift (Caps), NumericPad, Help, NonCoalesced
-                let relevantFlags: CGEventFlags = [
-                    .maskCommand, .maskShift, .maskControl, .maskAlternate,
-                ]
+                let relevantFlags: CGEventFlags = [.maskCommand, .maskShift]
+                // Check if BOTH Cmd and Shift are present
+                // Note: We ignore other modifiers for simplicity, or we can enforce EXACT match
+                // Let's enforce that Cmd and Shift are set, but ignore CapsLock/Fn
+                // If Ctrl or Opt are pressed, we treat it as interruption?
+                // For now, simple check:
                 let currentRelevant = flags.intersection(relevantFlags)
 
-                if currentRelevant == [.maskCommand, .maskShift] {
-                    // Check if this is the "press" event (flags changed includes press and release)
-                    // If we just detected the combo, toggle.
-                    // But flagsChanged fires for each key.
-                    // 1. Press Cmd -> flags has Cmd
-                    // 2. Press Shift -> flags has Cmd+Shift -> Toggle!
-                    // 3. Release Shift -> flags has Cmd
-                    // 4. Release Cmd -> flags empty
-
-                    // Issue: If user holds Cmd+Shift, auto-repeat doesn't trigger flagsChanged usually.
-                    // But if they press Cmd, then Shift, it toggles.
-                    // If they press Shift, then Cmd, it toggles.
-
-                    // We need to debounce or ensure we don't toggle repeatedly if valid?
-                    // Actually, Windows switcher usually toggles on RELEASE or invalid key?
-                    // macOS input source switcher (Cmd+Space) toggles immediately.
-                    // Let's toggle immediately.
-
-                    // To prevent double toggle if they press unrelated keys? No, flagsChanged only fires on modifier keys.
-                    // But we should track state to only toggle once per press sequence?
-                    // For now, let's keep it simple: Toggle.
-
-                    unikey.vietnameseEnabled.toggle()
-                    unikey.resetBuf()
-
-                    // Notify AppDelegate to update UI
-                    languageToggleCallback?(unikey.vietnameseEnabled)
-
-                    // Debug log
-                    debugLogCallback?(
-                        "Toggle via Cmd+Shift: \(unikey.vietnameseEnabled ? "VI" : "EN")"
-                    )
-
-                    // We generally don't consume flagsChanged events as they affect system state
-                    return Unmanaged.passUnretained(event)
+                if currentRelevant == relevantFlags {
+                    // Cmd + Shift are PRESSED
+                    if !modifierState.cmdShiftPressed {
+                        modifierState.cmdShiftPressed = true
+                        modifierState.interrupted = false
+                        // Check if other modifiers are pressed (Ctrl/Alt) -> treat as interruption immediately?
+                        // xkey checks exact match. Let's stick to basics first.
+                        if flags.contains(.maskControl)
+                            || flags.contains(.maskAlternate)
+                        {
+                            modifierState.interrupted = true
+                        }
+                    }
+                } else {
+                    // Cmd + Shift are NOT both pressed (Released)
+                    if modifierState.cmdShiftPressed {
+                        // Was pressed, now released. Check if valid toggle.
+                        if !modifierState.interrupted {
+                            // Valid toggle!
+                            unikey.vietnameseEnabled.toggle()
+                            unikey.resetBuf()
+                            languageToggleCallback?(unikey.vietnameseEnabled)
+                            debugLogCallback?(
+                                "Toggle via Cmd+Shift (Release): \(unikey.vietnameseEnabled ? "VI" : "EN")"
+                            )
+                        }
+                        modifierState.cmdShiftPressed = false
+                    }
                 }
             }
             return Unmanaged.passUnretained(event)
@@ -397,6 +387,11 @@ public class UnikeyEventTapManager {
         // xim.c: if (call_data->event.type != KeyPress) goto forwardEv
         guard type == .keyDown else {
             return Unmanaged.passUnretained(event)
+        }
+
+        // Interrupt modifier state if any key is pressed
+        if modifierState.cmdShiftPressed {
+            modifierState.interrupted = true
         }
 
         // Check Vietnamese mode
