@@ -1,8 +1,8 @@
 # Contributing to Unikey for macOS
 
-Đầu tiên, cảm ơn bạn đã quan tâm đến việc đóng góp cho Unikey! 🎉
+Đầu tiên, cảm ơn bạn đã quan tâm đến việc đóng góp cho Unikey!
 
-First off, thank you for considering contributing to Unikey! 🎉
+First off, thank you for considering contributing to Unikey!
 
 [Tiếng Việt](#hướng-dẫn-đóng-góp) | [English](#contribution-guidelines)
 
@@ -10,7 +10,7 @@ First off, thank you for considering contributing to Unikey! 🎉
 
 ## Hướng dẫn đóng góp
 
-### 📋 Mục lục
+### Mục lục
 
 - [Quy tắc ứng xử](#quy-tắc-ứng-xử)
 - [Cách đóng góp](#cách-đóng-góp)
@@ -18,7 +18,7 @@ First off, thank you for considering contributing to Unikey! 🎉
 - [Coding Standards](#coding-standards)
 - [Commit Messages](#commit-messages)
 
-### 📜 Quy tắc ứng xử
+### Quy tắc ứng xử
 
 Dự án này tuân theo các nguyên tắc sau:
 
@@ -27,7 +27,7 @@ Dự án này tuân theo các nguyên tắc sau:
 - **Hợp tác**: Làm việc cùng nhau vì mục tiêu chung
 - **Minh bạch**: Thảo luận công khai về các quyết định
 
-### 🚀 Cách đóng góp
+### Cách đóng góp
 
 #### Báo cáo lỗi (Bug Reports)
 
@@ -55,7 +55,7 @@ Sử dụng [Improvement Template](https://github.com/hieunguyen1053/Unikey/issu
 4. Push và tạo Pull Request
 5. Đợi review và phản hồi
 
-### 🔄 Quy trình phát triển
+### Quy trình phát triển
 
 ```mermaid
 graph LR
@@ -88,7 +88,7 @@ graph LR
    xcodebuild test -scheme Unikey -destination 'platform=macOS'
    ```
 
-### 📝 Coding Standards
+### Coding Standards
 
 #### Swift Style Guide
 
@@ -119,7 +119,7 @@ private func updateState() {
 }
 ```
 
-### 💬 Commit Messages
+### Commit Messages
 
 Sử dụng format sau:
 
@@ -154,7 +154,7 @@ Closes #123
 
 ## Contribution Guidelines
 
-### 📋 Table of Contents
+### Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
 - [How to Contribute](#how-to-contribute)
@@ -162,7 +162,7 @@ Closes #123
 - [Coding Standards](#coding-standards-1)
 - [Commit Messages](#commit-messages-1)
 
-### 📜 Code of Conduct
+### Code of Conduct
 
 This project follows these principles:
 
@@ -171,7 +171,7 @@ This project follows these principles:
 - **Collaboration**: Work together towards common goals
 - **Transparency**: Open discussion about decisions
 
-### 🚀 How to Contribute
+### How to Contribute
 
 #### Bug Reports
 
@@ -199,7 +199,7 @@ Use the [Improvement Template](https://github.com/hieunguyen1053/Unikey/issues/n
 4. Push and create a Pull Request
 5. Wait for review and feedback
 
-### 🔄 Development Process
+### Development Process
 
 1. **Fork and Clone**
    ```bash
@@ -220,7 +220,7 @@ Use the [Improvement Template](https://github.com/hieunguyen1053/Unikey/issues/n
    xcodebuild test -scheme Unikey -destination 'platform=macOS'
    ```
 
-### 📝 Coding Standards
+### Coding Standards
 
 #### Swift Style Guide
 
@@ -229,7 +229,7 @@ Use the [Improvement Template](https://github.com/hieunguyen1053/Unikey/issues/n
 - Maximum line length: 120 characters
 - Use meaningful variable names
 
-### 💬 Commit Messages
+### Commit Messages
 
 Use the following format:
 
@@ -254,16 +254,16 @@ Use the following format:
 
 <div align="center">
 
-## 🎯 Areas Where We Need Help
+## Areas Where We Need Help
 
 | Area | Description | Difficulty |
 |------|-------------|------------|
-| 🐛 Bug Fixes | Fix reported issues | Easy - Medium |
-| 📝 Documentation | Improve docs and guides | Easy |
-| 🧪 Testing | Add more unit tests | Medium |
-| 🌐 Localization | Add more languages | Easy |
-| ✨ Features | Implement new features | Medium - Hard |
-| 🎨 UI/UX | Improve user interface | Medium |
+| Bug Fixes | Fix reported issues | Easy - Medium |
+| Documentation | Improve docs and guides | Easy |
+| Testing | Add more unit tests | Medium |
+| Localization | Add more languages | Easy |
+| Features | Implement new features | Medium - Hard |
+| UI/UX | Improve user interface | Medium |
 
 ---
 
