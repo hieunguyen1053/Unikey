@@ -1,0 +1,44 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Swift
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest]
+        swift: ['5.9']
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: swift-actions/setup-swift@v3
+      with:
+        swift-version: ${{ matrix.swift }}
+
+    - name: Build
+      run: |
+        xcodebuild build \
+          -project Unikey.xcodeproj \
+          -scheme Unikey \
+          -destination 'platform=macOS' \
+          -quiet
+
+    - name: Run tests
+      run: |
+        xcodebuild test \
+          -project Unikey.xcodeproj \
+          -scheme Unikey \
+          -destination 'platform=macOS' \
+          -quiet
