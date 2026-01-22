@@ -637,8 +637,8 @@ private let vowelSeqTable: [VowelSequence: VowelSeqInfo] = [
         subsequences: [.o, .oa, .oai],
         withRoof: .none,
         withHook: .none,
-        roofPosition: 0,
-        hookPosition: 1
+        roofPosition: -1,
+        hookPosition: -1
     ),
     .oay: VowelSeqInfo(
         length: 3,
@@ -648,8 +648,8 @@ private let vowelSeqTable: [VowelSequence: VowelSeqInfo] = [
         subsequences: [.o, .oa, .oay],
         withRoof: .none,
         withHook: .none,
-        roofPosition: 0,
-        hookPosition: 1
+        roofPosition: -1,
+        hookPosition: -1
     ),
     .oeo: VowelSeqInfo(
         length: 3,
@@ -750,7 +750,7 @@ private let vowelSeqTable: [VowelSequence: VowelSeqInfo] = [
         withRoof: .none,
         withHook: .none,
         roofPosition: -1,
-        hookPosition: 0
+        hookPosition: -1
     ),
     .uye: VowelSeqInfo(
         length: 3,
@@ -783,7 +783,7 @@ private let vowelSeqTable: [VowelSequence: VowelSeqInfo] = [
         withRoof: .none,
         withHook: .none,
         roofPosition: -1,
-        hookPosition: 0
+        hookPosition: -1
     ),
 
     .uhoi: VowelSeqInfo(
