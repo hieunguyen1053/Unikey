@@ -189,9 +189,9 @@ struct PreferencesView: View {
             // MARK: - Footer Buttons
             HStack {
                 Button {
-                    showHelp()
+                    openHomePage()
                 } label: {
-                    Label(L.help, systemImage: "questionmark.circle")
+                    Label(L.homePage, systemImage: "house")
                 }
 
                 Button(L.about) {
@@ -216,8 +216,8 @@ struct PreferencesView: View {
         MacroEditorWindowController.shared.showEditor()
     }
 
-    private func showHelp() {
-        if let url = URL(string: "https://www.unikey.org/huong-dan.html") {
+    private func openHomePage() {
+        if let url = URL(string: "https://github.com/hieunguyen1053/Unikey") {
             NSWorkspace.shared.open(url)
         }
     }
