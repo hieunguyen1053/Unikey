@@ -2,6 +2,7 @@
 // SwiftUI-based Preferences View matching Windows Unikey layout
 // Unikey Vietnamese Input Method
 
+import Cocoa
 import ServiceManagement
 import SwiftUI
 
@@ -277,10 +278,10 @@ struct PreferencesWindow: View {
 
 // MARK: - Helper to show preferences window
 
-class PreferencesWindowManager {
+class PreferencesWindowManager: NSObject, NSWindowDelegate {
     static let shared = PreferencesWindowManager()
 
-    private var window: NSWindow?
+    private(set) var window: NSWindow?
 
     func showPreferences() {
         if window == nil {
@@ -294,6 +295,7 @@ class PreferencesWindowManager {
             window?.title = "Unikey"
             window?.contentView = NSHostingView(rootView: preferencesView)
             window?.center()
+            window?.delegate = self
         }
 
         window?.makeKeyAndOrderFront(nil)
@@ -302,5 +304,9 @@ class PreferencesWindowManager {
 
     func closePreferences() {
         window?.close()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        window = nil
     }
 }
