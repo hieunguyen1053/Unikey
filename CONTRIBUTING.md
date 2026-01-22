@@ -32,18 +32,15 @@ Dự án này tuân theo các nguyên tắc sau:
 #### Báo cáo lỗi (Bug Reports)
 
 1. Kiểm tra [Issues](https://github.com/hieunguyen1053/Unikey/issues) để xem lỗi đã được báo cáo chưa
-2. Nếu chưa, tạo issue mới với:
-   - Mô tả rõ ràng về lỗi
-   - Các bước để tái tạo lỗi
-   - Phiên bản macOS và Unikey
-   - Screenshots nếu có thể
+2. Nếu chưa, [tạo Bug Report](https://github.com/hieunguyen1053/Unikey/issues/new?template=bug.yml) với mô tả chi tiết
 
 #### Đề xuất tính năng (Feature Requests)
 
-1. Mở một issue mới với label `enhancement`
-2. Mô tả chi tiết tính năng mong muốn
-3. Giải thích tại sao tính năng này hữu ích
-4. Đề xuất cách triển khai (nếu có)
+Sử dụng [Feature Request Template](https://github.com/hieunguyen1053/Unikey/issues/new?template=feature_request.yml) để đề xuất tính năng mới.
+
+#### Cải tiến (Improvements)
+
+Sử dụng [Improvement Template](https://github.com/hieunguyen1053/Unikey/issues/new?template=improvement.yml) để đề xuất cải tiến cho chức năng hiện có hoặc bổ sung tài liệu.
 
 #### Pull Requests
 
@@ -179,18 +176,15 @@ This project follows these principles:
 #### Bug Reports
 
 1. Check existing [Issues](https://github.com/hieunguyen1053/Unikey/issues)
-2. If not reported, create a new issue with:
-   - Clear description of the bug
-   - Steps to reproduce
-   - macOS and Unikey version
-   - Screenshots if possible
+2. If not reported, [create a Bug Report](https://github.com/hieunguyen1053/Unikey/issues/new?template=bug.yml) with detailed description
 
 #### Feature Requests
 
-1. Open a new issue with label `enhancement`
-2. Describe the feature in detail
-3. Explain why it would be useful
-4. Suggest implementation approach (if any)
+Use the [Feature Request Template](https://github.com/hieunguyen1053/Unikey/issues/new?template=feature_request.yml) to suggest new features.
+
+#### Improvements
+
+Use the [Improvement Template](https://github.com/hieunguyen1053/Unikey/issues/new?template=improvement.yml) to suggest improvements for existing functionality or documentation.
 
 #### Pull Requests
 
