@@ -367,7 +367,7 @@ private let vowelSeqTable: [VowelSequence: VowelSeqInfo] = [
         subsequences: [.o, .oab],
         withRoof: .none,
         withHook: .none,
-        roofPosition: 0,
+        roofPosition: -1,
         hookPosition: 1
     ),
     .oe: VowelSeqInfo(
@@ -423,8 +423,8 @@ private let vowelSeqTable: [VowelSequence: VowelSeqInfo] = [
         subsequences: [.u, .ua],
         withRoof: .uar,
         withHook: .uha,
-        roofPosition: 1,
-        hookPosition: 0
+        roofPosition: -1,
+        hookPosition: -1
     ),
     .uar: VowelSeqInfo(
         length: 2,
