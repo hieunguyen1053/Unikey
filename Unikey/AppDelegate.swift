@@ -106,6 +106,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
+        // Observe app becoming active to check for permission changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationDidBecomeActive),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
+
         // Show preferences on startup if enabled
         if showDialogOnStartup {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -114,6 +122,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         NSLog("Unikey: Ready!")
+    }
+
+    @objc func applicationDidBecomeActive(_ notification: Notification) {
+        // Retry starting event tap if needed (e.g. permission just granted)
+        if let eventTap = eventTap, !eventTap.isRunning {
+            NSLog("Unikey: App became active, attempting to start event tap...")
+            try? eventTap.start()
+        }
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
@@ -131,6 +147,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         eventTap = UnikeyEventTapManager()
         eventTap?.debugLogCallback = { msg in
             NSLog("Unikey: \(msg)")
+        }
+
+        // Callback when language is toggled via shortcut
+        eventTap?.languageToggleCallback = { [weak self] isVietnamese in
+            DispatchQueue.main.async {
+                self?.vietnameseEnabled = isVietnamese
+                self?.updateStatusBarTitle()
+                self?.rebuildMenu()
+            }
         }
 
         let method =
@@ -157,10 +182,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             modernStyle: modernStyle,
             spellCheckEnabled: spellCheckEnabled,
             autoNonVnRestore: autoRestore,
-            macroEnabled: macroEnabled
+            macroEnabled: macroEnabled,
+            switchKeyType: UserDefaults.standard.integer(
+                forKey: "UniKeySwitchKey"
+            )
         )
         NSLog(
-            "Unikey: Options synced - freeMarking:\(freeMarking) modernStyle:\(modernStyle) spellCheck:\(spellCheckEnabled) autoRestore:\(autoRestore) macro:\(macroEnabled)"
+            "Unikey: Options synced - freeMarking:\(freeMarking) modernStyle:\(modernStyle) spellCheck:\(spellCheckEnabled) autoRestore:\(autoRestore) macro:\(macroEnabled) switchKey:\(UserDefaults.standard.integer(forKey: "UniKeySwitchKey"))"
         )
     }
 
@@ -211,28 +239,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         let menu = NSMenu()
 
-        // MARK: - Help & Tools
-        menu.addItem(
-            NSMenuItem(
-                title: "menu.help".localized,
-                action: #selector(openHomePage),
-                keyEquivalent: ""
-            )
+        // MARK: - Language Selection
+        let vietnameseItem = NSMenuItem(
+            title: "VI",
+            action: #selector(selectVietnamese),
+            keyEquivalent: ""
         )
-        menu.addItem(
-            NSMenuItem(
-                title: "menu.tools".localized,
-                action: #selector(showTools),
-                keyEquivalent: ""
-            )
+        vietnameseItem.state = vietnameseEnabled ? .on : .off
+        menu.addItem(vietnameseItem)
+
+        let englishItem = NSMenuItem(
+            title: "EN",
+            action: #selector(selectEnglish),
+            keyEquivalent: ""
         )
-        menu.addItem(
-            NSMenuItem(
-                title: "menu.quick_convert".localized,
-                action: #selector(quickConvert),
-                keyEquivalent: ""
-            )
-        )
+        englishItem.state = vietnameseEnabled ? .off : .on
+        menu.addItem(englishItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -337,11 +359,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu Actions
 
-    @objc func toggleVietnamese() {
-        vietnameseEnabled.toggle()
+    @objc func selectVietnamese() {
+        vietnameseEnabled = true
         eventTap?.vietnameseEnabled = vietnameseEnabled
         eventTap?.reset()
         updateStatusBarTitle()
+        rebuildMenu()
+    }
+
+    @objc func selectEnglish() {
+        vietnameseEnabled = false
+        eventTap?.vietnameseEnabled = vietnameseEnabled
+        eventTap?.reset()
+        updateStatusBarTitle()
+        rebuildMenu()
     }
 
     @objc func toggleSpellCheck() {

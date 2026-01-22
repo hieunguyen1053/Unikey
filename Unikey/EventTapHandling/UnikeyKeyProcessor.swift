@@ -238,6 +238,15 @@ public class UnikeyKeyProcessor {
         return ProcessKeyResult(consumed: false)
     }
 
+    // MARK: - Switch Key Types
+
+    public enum UnikeySwitchKeyType: Int {
+        case cmdShift = 0
+        case cmdShiftV = 1
+    }
+
+    public var switchKeyType: UnikeySwitchKeyType = .cmdShift
+
     // MARK: - Key Classification
 
     /// Check if key is a forward key (reset state and pass through)
@@ -249,16 +258,32 @@ public class UnikeyKeyProcessor {
     /// Check if key is a switch key (toggle Vietnamese mode)
     /// Mirrors xim.c: isSwitchKey() (lines 370-405)
     public func isSwitchKey(keyCode: UInt16, flags: CGEventFlags) -> Bool {
-        // Control+Shift or Alt+Shift toggles Vietnamese mode
-        // Original xim.c checks for Shift_L/Shift_R with Control or Alt modifier
+        // macOS 10.12+ uses .maskCommand, .maskShift, etc.
+        let hasCommand = flags.contains(.maskCommand)
+        let hasShift = flags.contains(.maskShift)
 
-        // For macOS, we use Control+Space or similar
-        // This is a simplified version
-        if keyCode == KeyCode.space && flags.contains(.maskControl) {
-            return true
+        switch switchKeyType {
+        case .cmdShift:
+            // For Cmd+Shift, we need to detect when ONLY Cmd and Shift are pressed.
+            // This is usually handled in .flagsChanged event, but here we might receive it
+            // if it's a key down event for a non-modifier key while Cmd+Shift are held?
+            // Actually, for "Cmd+Shift" toggling, we usually want to trigger on the RELEASE of Shift
+            // while Cmd is held (or vice versa), or simply when they are both pressed.
+            // However, `isSwitchKey` is called from `processKey` (keyDown) in the current logic.
+            // To support modifier-only shortcuts (Cmd+Shift), we need to handle .flagsChanged in EventTapManager.
+            // PROCEED TO UPDATE EventTapManager for 'flagsChanged' handling.
+
+            // This function is for KeyDown events.
+            // If the user wants "Cmd + Shift + V", we check it here.
+            return false
+
+        case .cmdShiftV:
+            // Check for V key (keyCode 0x09) with Cmd + Shift
+            if keyCode == 0x09 && hasCommand && hasShift {
+                return true
+            }
+            return false
         }
-
-        return false
     }
 
     /// Check if key is a shortcut
