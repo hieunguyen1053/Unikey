@@ -215,7 +215,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(
             NSMenuItem(
                 title: "menu.help".localized,
-                action: #selector(showHelp),
+                action: #selector(openHomePage),
                 keyEquivalent: ""
             )
         )
@@ -368,8 +368,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         rebuildMenu()
     }
 
-    @objc func showHelp() {
-        if let url = URL(string: "https://www.unikey.org/huong-dan.html") {
+    @objc func openHomePage() {
+        if let url = URL(string: "https://github.com/hieunguyen1053/Unikey") {
             NSWorkspace.shared.open(url)
         }
     }

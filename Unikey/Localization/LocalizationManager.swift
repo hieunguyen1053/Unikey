@@ -64,6 +64,7 @@ struct LocalizedStrings {
     let showOnStartup: String
     let launchAtLogin: String
     let language: String
+    let homePage: String
 
     let help: String
     let about: String
@@ -77,7 +78,7 @@ struct LocalizedStrings {
 
     // Vietnamese strings
     static let vietnamese = LocalizedStrings(
-        menuHelp: "Hướng dẫn",
+        menuHelp: "Trang chủ",
         menuTools: "Công cụ...",
         menuQuickConvert: "Chuyển mã nhanh",
         menuSpellCheck: "Bật kiểm tra chính tả",
@@ -114,6 +115,7 @@ struct LocalizedStrings {
         showOnStartup: "Bật hội thoại này khi khởi động",
         launchAtLogin: "Khởi động cùng macOS",
         language: "Ngôn ngữ",
+        homePage: "Trang chủ",
 
         help: "Hướng dẫn",
         about: "Thông tin",
@@ -128,7 +130,7 @@ struct LocalizedStrings {
 
     // English strings
     static let english = LocalizedStrings(
-        menuHelp: "Help",
+        menuHelp: "Home Page",
         menuTools: "Tools...",
         menuQuickConvert: "Quick Convert",
         menuSpellCheck: "Enable Spell Check",
@@ -165,6 +167,7 @@ struct LocalizedStrings {
         showOnStartup: "Show this dialog on startup",
         launchAtLogin: "Launch at Login",
         language: "Language",
+        homePage: "Home",
 
         help: "Help",
         about: "About",
