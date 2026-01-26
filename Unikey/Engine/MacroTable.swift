@@ -36,33 +36,35 @@ public class MacroTable: ObservableObject {
     // MARK: - Private Properties
 
     private let fileManager = FileManager.default
-    private var macroFilePath: URL {
-        let appSupport = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
-        let unikeyDir = appSupport.appendingPathComponent(
-            "Unikey",
-            isDirectory: true
-        )
-
-        // Create directory if needed
-        if !fileManager.fileExists(atPath: unikeyDir.path) {
-            try? fileManager.createDirectory(
-                at: unikeyDir,
-                withIntermediateDirectories: true
-            )
-        }
-
-        return unikeyDir.appendingPathComponent("macros.json")
-    }
+    private var macroFilePath: URL
 
     // Lookup cache for performance
     private var lookupCache: [String: String] = [:]
 
     // MARK: - Initialization
 
-    public init() {
+    public init(fileURL: URL? = nil) {
+        if let url = fileURL {
+            self.macroFilePath = url
+        } else {
+            let appSupport = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first!
+            let unikeyDir = appSupport.appendingPathComponent(
+                "Unikey",
+                isDirectory: true
+            )
+
+            // Create directory if needed
+            if !fileManager.fileExists(atPath: unikeyDir.path) {
+                try? fileManager.createDirectory(
+                    at: unikeyDir,
+                    withIntermediateDirectories: true
+                )
+            }
+            self.macroFilePath = unikeyDir.appendingPathComponent("macros.plist")
+        }
         loadMacros()
     }
 
@@ -141,7 +143,7 @@ public class MacroTable: ObservableObject {
 
     // MARK: - File Operations
 
-    /// Load macros from JSON file
+    /// Load macros from Plist file
     public func loadMacros() {
         guard fileManager.fileExists(atPath: macroFilePath.path) else {
             NSLog("MacroTable: No macro file found at \(macroFilePath.path)")
@@ -150,26 +152,37 @@ public class MacroTable: ObservableObject {
 
         do {
             let data = try Data(contentsOf: macroFilePath)
-            let decoder = JSONDecoder()
-            macros = try decoder.decode([MacroItem].self, from: data)
-            rebuildCache()
+            try decodeMacros(from: data)
             NSLog("MacroTable: Loaded \(macros.count) macros")
         } catch {
             NSLog("MacroTable: Failed to load macros: \(error)")
         }
     }
 
-    /// Save macros to JSON file
+    /// Save macros to Plist file
     public func saveMacros() {
         do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(macros)
+            let data = try encodeMacros()
             try data.write(to: macroFilePath)
             NSLog("MacroTable: Saved \(macros.count) macros")
         } catch {
+            print("MacroTable: Failed to save macros: \(error)")
             NSLog("MacroTable: Failed to save macros: \(error)")
         }
+    }
+    
+    // MARK: - Helpers for Testing
+    
+    internal func encodeMacros() throws -> Data {
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .xml // XML for readability/debug, change to binary later if needed
+        return try encoder.encode(macros)
+    }
+    
+    internal func decodeMacros(from data: Data) throws {
+        let decoder = PropertyListDecoder()
+        macros = try decoder.decode([MacroItem].self, from: data)
+        rebuildCache()
     }
 
     /// Load macros from a file (legacy format: key:text per line)
