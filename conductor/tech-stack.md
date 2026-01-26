@@ -12,6 +12,9 @@
 - **Core Graphics (CGEventTap):** The core mechanism for intercepting and processing global keyboard events.
 - **Accessibility API:** Required for the Event Tap to function correctly across applications.
 
+## Data Persistence
+- **Macro Storage:** Native Property List (.plist) format for storing user-defined macros.
+
 ## Tools & Infrastructure
 - **Xcode:** Primary development environment and build system (`.xcodeproj`).
 - **XCTest:** Built-in framework for unit testing the engine and engine processing logic.
