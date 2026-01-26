@@ -789,10 +789,17 @@ final class EngineTests: XCTestCase {
         assertInput("nooji", produces: "nội")
     }
 
-    func testWord_SaiGon() {
-        assertInput("saif", produces: "sài")
-        engine.reset()
-        assertInput("gonf", produces: "gòn")
+        func testWord_SaiGon() {
+
+            assertInput("saif", produces: "sài")
+
+            engine.reset()
+
+            assertInput("gonf", produces: "gòn")
+
+        }
+
+    
+
     }
 
-}
