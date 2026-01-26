@@ -1,8 +1,0 @@
-{
-  "track_id": "macro_20260126",
-  "type": "feature",
-  "status": "new",
-  "created_at": "2026-01-26T14:30:00Z",
-  "updated_at": "2026-01-26T14:30:00Z",
-  "description": "triển khai chức năng macro, sử dụng Linear Search on Sorted Array"
-}
