@@ -12,10 +12,10 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Core Engine & Persistence Refactoring' (Protocol in workflow.md) [checkpoint: 71498aa]
 
 ## Phase 2: Input Method Integration
-- [ ] Task: Integrate Macro Lookup into the Input Processor
-    - [ ] Write unit tests for triggering macro replacement on Space/Enter in `UnikeyTests/MacroTriggerTests.swift`
-    - [ ] Identify the correct hook in `UnikeyKeyProcessor.swift` or `UkEngine.swift` to intercept termination keys
-    - [ ] Implement the expansion logic: if a macro exists for the current buffer, replace it and reset the buffer
+- [x] Task: Integrate Macro Lookup into the Input Processor
+    - [x] Write unit tests for triggering macro replacement on Space/Enter in `UnikeyTests/MacroTriggerTests.swift`
+    - [x] Identify the correct hook in `UnikeyKeyProcessor.swift` or `UkEngine.swift` to intercept termination keys
+    - [x] Implement the expansion logic: if a macro exists for the current buffer, replace it and reset the buffer
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Input Method Integration' (Protocol in workflow.md)
 
 ## Phase 3: User Interface Enhancement
