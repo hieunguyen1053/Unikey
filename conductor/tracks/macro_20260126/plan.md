@@ -9,7 +9,7 @@
     - [x] Write unit tests for Linear Search behavior (specifically verifying it works correctly with lazy sorting)
     - [x] Refactor `MacroTable.lookup` to perform a linear search (O(n))
     - [x] Refactor `sortAndSave` to ensure sorting ONLY happens before saving to disk
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Core Engine & Persistence Refactoring' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Core Engine & Persistence Refactoring' (Protocol in workflow.md) [checkpoint: 71498aa]
 
 ## Phase 2: Input Method Integration
 - [ ] Task: Integrate Macro Lookup into the Input Processor
