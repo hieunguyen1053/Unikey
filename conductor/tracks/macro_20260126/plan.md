@@ -5,10 +5,10 @@
     - [x] Write unit tests for `.plist` saving and loading in `UnikeyTests/MacroTests.swift`
     - [x] Update `macroFilePath` to use `macros.plist`
     - [x] Replace `JSONEncoder`/`JSONDecoder` with `PropertyListEncoder`/`PropertyListDecoder`
-- [ ] Task: Refactor Core Logic for "Linear Search on Sorted Array"
-    - [ ] Write unit tests for Linear Search behavior (specifically verifying it works correctly with lazy sorting)
-    - [ ] Refactor `MacroTable.lookup` to perform a linear search (O(n))
-    - [ ] Refactor `sortAndSave` to ensure sorting ONLY happens before saving to disk
+- [x] Task: Refactor Core Logic for "Linear Search on Sorted Array" 5636388
+    - [x] Write unit tests for Linear Search behavior (specifically verifying it works correctly with lazy sorting)
+    - [x] Refactor `MacroTable.lookup` to perform a linear search (O(n))
+    - [x] Refactor `sortAndSave` to ensure sorting ONLY happens before saving to disk
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Core Engine & Persistence Refactoring' (Protocol in workflow.md)
 
 ## Phase 2: Input Method Integration
