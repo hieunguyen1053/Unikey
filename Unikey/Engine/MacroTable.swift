@@ -107,7 +107,7 @@ public class MacroTable: ObservableObject {
             // Add new
             macros.append(MacroItem(key: key, text: text))
         }
-        sortAndSave()
+        rebuildCache()
     }
 
     /// Update an existing macro
@@ -115,20 +115,20 @@ public class MacroTable: ObservableObject {
         if let index = macros.firstIndex(where: { $0.id == id }) {
             macros[index].key = key
             macros[index].text = text
-            sortAndSave()
+            rebuildCache()
         }
     }
 
     /// Delete a macro by ID
     public func deleteItem(id: UUID) {
         macros.removeAll { $0.id == id }
-        sortAndSave()
+        rebuildCache()
     }
 
     /// Delete multiple macros
     public func deleteItems(ids: Set<UUID>) {
         macros.removeAll { ids.contains($0.id) }
-        sortAndSave()
+        rebuildCache()
     }
 
     /// Get all macros
@@ -153,6 +153,7 @@ public class MacroTable: ObservableObject {
         do {
             let data = try Data(contentsOf: macroFilePath)
             try decodeMacros(from: data)
+            sortMacros()
             NSLog("MacroTable: Loaded \(macros.count) macros")
         } catch {
             NSLog("MacroTable: Failed to load macros: \(error)")
@@ -161,6 +162,7 @@ public class MacroTable: ObservableObject {
 
     /// Save macros to Plist file
     public func saveMacros() {
+        sortMacros()
         do {
             let data = try encodeMacros()
             try data.write(to: macroFilePath)
@@ -175,7 +177,7 @@ public class MacroTable: ObservableObject {
     
     internal func encodeMacros() throws -> Data {
         let encoder = PropertyListEncoder()
-        encoder.outputFormat = .xml // XML for readability/debug, change to binary later if needed
+        encoder.outputFormat = .xml
         return try encoder.encode(macros)
     }
     
@@ -229,7 +231,8 @@ public class MacroTable: ObservableObject {
             }
         }
 
-        sortAndSave()
+        sortMacros()
+        saveMacros()
         NSLog("MacroTable: Imported \(macros.count) macros from \(fname)")
         return true
     }
@@ -304,10 +307,9 @@ public class MacroTable: ObservableObject {
 
     // MARK: - Private Methods
 
-    private func sortAndSave() {
+    private func sortMacros() {
         macros.sort { $0.key.lowercased() < $1.key.lowercased() }
         rebuildCache()
-        saveMacros()
     }
 
     private func rebuildCache() {
