@@ -19,10 +19,10 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Input Method Integration' (Protocol in workflow.md) [checkpoint: d221012]
 
 ## Phase 3: User Interface Enhancement
-- [ ] Task: Polish the Macro Editor UI
-    - [ ] Review `Unikey/UI/MacroEditorView.swift` (if exists) or create it
-    - [ ] Ensure the UI allows adding/deleting macros and reflects the `MacroTable` state
-    - [ ] Add "Export to Plist" and "Import from Plist" buttons to the UI
+- [x] Task: Polish the Macro Editor UI
+    - [x] Review `Unikey/UI/MacroEditorView.swift` (if exists) or create it
+    - [x] Ensure the UI allows adding/deleting macros and reflects the `MacroTable` state
+    - [x] Add "Export to Plist" and "Import from Plist" buttons to the UI
 - [ ] Task: Final Quality Pass
     - [ ] Verify test coverage for all new macro logic (>80%)
     - [ ] Perform a full end-to-end test: Type a macro -> Space -> Replacement occurs
