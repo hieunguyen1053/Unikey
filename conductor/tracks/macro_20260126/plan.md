@@ -1,10 +1,10 @@
 # Implementation Plan: Macro Support with Sorted Array Linear Search
 
 ## Phase 1: Core Engine & Persistence Refactoring
-- [ ] Task: Refactor `MacroItem` and `MacroTable` to use Plist persistence
-    - [ ] Write unit tests for `.plist` saving and loading in `UnikeyTests/MacroTests.swift`
-    - [ ] Update `macroFilePath` to use `macros.plist`
-    - [ ] Replace `JSONEncoder`/`JSONDecoder` with `PropertyListEncoder`/`PropertyListDecoder`
+- [x] Task: Refactor `MacroItem` and `MacroTable` to use Plist persistence 586ee7c
+    - [x] Write unit tests for `.plist` saving and loading in `UnikeyTests/MacroTests.swift`
+    - [x] Update `macroFilePath` to use `macros.plist`
+    - [x] Replace `JSONEncoder`/`JSONDecoder` with `PropertyListEncoder`/`PropertyListDecoder`
 - [ ] Task: Refactor Core Logic for "Linear Search on Sorted Array"
     - [ ] Write unit tests for Linear Search behavior (specifically verifying it works correctly with lazy sorting)
     - [ ] Refactor `MacroTable.lookup` to perform a linear search (O(n))
