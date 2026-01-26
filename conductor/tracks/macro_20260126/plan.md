@@ -16,7 +16,7 @@
     - [x] Write unit tests for triggering macro replacement on Space/Enter in `UnikeyTests/MacroTriggerTests.swift`
     - [x] Identify the correct hook in `UnikeyKeyProcessor.swift` or `UkEngine.swift` to intercept termination keys
     - [x] Implement the expansion logic: if a macro exists for the current buffer, replace it and reset the buffer
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Input Method Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Input Method Integration' (Protocol in workflow.md) [checkpoint: d221012]
 
 ## Phase 3: User Interface Enhancement
 - [ ] Task: Polish the Macro Editor UI
