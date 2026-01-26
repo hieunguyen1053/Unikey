@@ -789,10 +789,51 @@ final class EngineTests: XCTestCase {
         assertInput("nooji", produces: "nội")
     }
 
-    func testWord_SaiGon() {
-        assertInput("saif", produces: "sài")
-        engine.reset()
-        assertInput("gonf", produces: "gòn")
+        func testWord_SaiGon() {
+
+            assertInput("saif", produces: "sài")
+
+            engine.reset()
+
+            assertInput("gonf", produces: "gòn")
+
+        }
+
+    
+
     }
 
+// MARK: - Linear Search Tests
+class LinearSearchTests: XCTestCase {
+    func testLazySortingAndLinearSearch() {
+        let table = MacroTable()
+        table.initTable()
+        
+        // Add items out of order
+        table.addItem(key: "z", text: "Zebra")
+        table.addItem(key: "a", text: "Alpha")
+        
+        // Assert Unsorted (Lazy Sort requirement)
+        // Current implementation sorts on add, so this should FAIL
+        let macros = table.getAllMacros()
+        XCTAssertEqual(macros.count, 2)
+        if macros.count >= 2 {
+             // Expecting insertion order or at least NOT sorted yet
+             // If it IS sorted, macros[0] would be "a".
+             // We want it to NOT be sorted until save.
+             XCTAssertEqual(macros[0].key, "z", "Array should not be sorted immediately on add")
+        }
+        
+        // Assert Linear Search works on unsorted array
+        XCTAssertEqual(table.lookup(key: "z"), "Zebra")
+        XCTAssertEqual(table.lookup(key: "a"), "Alpha")
+        
+        // Trigger Save (which should Sort)
+        // We mocking save by calling the sort method if exposed, or saveMacros
+        // But saveMacros accesses disk. 
+        // We can check if `saveMacros` sorts it.
+        // table.saveMacros() // This might fail due to permission as seen before.
+        
+        // Ideally we expose `sort()` or verifying `saveMacros` sorts.
+    }
 }
