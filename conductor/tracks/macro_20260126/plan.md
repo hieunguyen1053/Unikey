@@ -23,7 +23,7 @@
     - [x] Review `Unikey/UI/MacroEditorView.swift` (if exists) or create it
     - [x] Ensure the UI allows adding/deleting macros and reflects the `MacroTable` state
     - [x] Add "Export to Plist" and "Import from Plist" buttons to the UI
-- [ ] Task: Final Quality Pass
-    - [ ] Verify test coverage for all new macro logic (>80%)
-    - [ ] Perform a full end-to-end test: Type a macro -> Space -> Replacement occurs
+- [x] Task: Final Quality Pass
+    - [x] Verify test coverage for all new macro logic (>80%)
+    - [x] Perform a full end-to-end test: Type a macro -> Space -> Replacement occurs
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: User Interface Enhancement' (Protocol in workflow.md)
