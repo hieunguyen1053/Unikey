@@ -375,6 +375,7 @@ struct MacroEditorView: View {
             Button(
                 localization.currentLanguage == .vietnamese ? "Đóng" : "Close"
             ) {
+                macroTable.saveMacros()
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
@@ -390,14 +391,23 @@ struct MacroEditorView: View {
         panel.title =
             localization.currentLanguage == .vietnamese
             ? "Chọn file macro" : "Select Macro File"
-        panel.allowedContentTypes = [.plainText, .json]
+        panel.allowedContentTypes = [.plainText, .json, .propertyList]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
 
         panel.begin { response in
             if response == .OK, let url = panel.url {
-                // Try to read and import
-                if url.pathExtension.lowercased() == "json" {
+                let ext = url.pathExtension.lowercased()
+                
+                if ext == "plist" {
+                    // Plist format
+                    if let data = try? Data(contentsOf: url),
+                       let items = try? PropertyListDecoder().decode([MacroItem].self, from: data) {
+                        for item in items {
+                            macroTable.addItem(key: item.key, text: item.text)
+                        }
+                    }
+                } else if ext == "json" {
                     // JSON format
                     if let data = try? Data(contentsOf: url),
                         let items = try? JSONDecoder().decode(
@@ -422,12 +432,22 @@ struct MacroEditorView: View {
         panel.title =
             localization.currentLanguage == .vietnamese
             ? "Lưu file macro" : "Save Macro File"
-        panel.nameFieldStringValue = "unikey_macros.txt"
-        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = "unikey_macros"
+        panel.allowedContentTypes = [.plainText, .propertyList]
+        panel.isExtensionHidden = false
 
         panel.begin { response in
             if response == .OK, let url = panel.url {
-                _ = macroTable.exportToFile(url.path)
+                let ext = url.pathExtension.lowercased()
+                if ext == "plist" {
+                    // Export as Plist
+                    if let data = try? PropertyListEncoder().encode(macroTable.macros) {
+                        try? data.write(to: url)
+                    }
+                } else {
+                    // Default to text
+                    _ = macroTable.exportToFile(url.path)
+                }
             }
         }
     }
